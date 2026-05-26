@@ -8,6 +8,8 @@ package jp.ac.u_tokai.cc.javaadvanced;
 //Map機能を使用するために汎用クラスをインポートする
 import java.util.HashMap;
 import java.util.Map;
+//検索事項をUserに入力してもらうためのクラスのインポート
+import java.util.Scanner;
 
 public class App {
     /**
@@ -43,31 +45,32 @@ public class App {
 
         System.out.println(">>> 演目をMapに登録しました。全" + performanceMap.size() + "件");
 
-        // テスト Mapから"test1"で検索し紐づいているデータを呼び出す
-        System.out.println("\n--- データをキーワード「test1」で検索し表示します　---");
+        //Scannerクラスを使った対話型の検索機能
+        System.out.println("\n--- 演目の検索 ---");
 
-        String searchKey = "test1";
+        // キーボード入力を受け取るためのScannerインスタンスを作成
+        Scanner scanner = new Scanner(System.in);
 
-        // 指定した曲名がMap内に存在しているか確認
+        //Userに入力を促すメッセージを表示
+        System.out.print("検索したい演目名を入力してください：");
+
+        //Userが入力した文字列を searchKey に代入
+        String searchKey = scanner.nextLine();
+
+        System.out.println("\n検索中... 「"  + searchKey + "」");
+
+        // 入力された文字(searchKey)を使ってMapを検索
         if (performanceMap.containsKey(searchKey)) {
             Performance target = performanceMap.get(searchKey);
             System.out.print("【検索ヒット】");
             target.show();
         } else {
-            System.out.println("「" + searchKey + "」という演目は登録されていません。");
-
+            System.out.println("「" + searchKey + "」という演目は登録されていません。")
         }
 
-        // 存在しないKeyで検索してみる
-        String UndefinedKey = "Down the Road";
-        System.out.println("\n--- 存在しないキーワードで検索してみる ---");
+        scanner.close();
 
-        if (performanceMap.containsKey(UndefinedKey)) {
-            Performance target = performanceMap.get(UndefinedKey);
-            target.show();
-        } else {
-            System.out.println("「" + UndefinedKey + "」という演目は登録されていません");
-        }
-        System.out.println("\n実行に成功");
+        System.out.println("\n実行に成功")
+
     }
 }
