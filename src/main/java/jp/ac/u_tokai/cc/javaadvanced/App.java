@@ -65,12 +65,12 @@ public class App {
             System.out.print("【検索ヒット】");
             target.show();
         } else {
-            System.out.println("「" + searchKey + "」という演目は登録されていません。")
+            System.out.println("「" + searchKey + "」という演目は登録されていません。");
         }
 
         scanner.close();
 
-        System.out.println("\n実行に成功")
+        System.out.println("\n実行に成功");
 
     }
 }
