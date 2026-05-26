@@ -5,11 +5,14 @@ package jp.ac.u_tokai.cc.javaadvanced;
  *
  */
 
-//Map機能を使用するために汎用クラスをインポートする
+// Map機能を使用するために汎用クラスをインポートする
 import java.util.HashMap;
 import java.util.Map;
-//検索事項をUserに入力してもらうためのクラスのインポート
+// 検索事項をUserに入力してもらうためのクラスのインポート
 import java.util.Scanner;
+// 時刻を扱うためのライブラリをインポート
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class App {
     /**
@@ -45,16 +48,16 @@ public class App {
 
         System.out.println(">>> 演目をMapに登録しました。全" + performanceMap.size() + "件");
 
-        //Scannerクラスを使った対話型の検索機能
+        // Scannerクラスを使った対話型の検索機能
         System.out.println("\n--- 演目の検索 ---");
 
         // キーボード入力を受け取るためのScannerインスタンスを作成
         Scanner scanner = new Scanner(System.in);
 
-        //Userに入力を促すメッセージを表示
+        // Userに入力を促すメッセージを表示
         System.out.print("検索したい演目名を入力してください：");
 
-        //Userが入力した文字列を searchKey に代入
+        // Userが入力した文字列を searchKey に代入
         String searchKey = scanner.nextLine();
 
         System.out.println("\n検索中... 「"  + searchKey + "」");
@@ -69,6 +72,19 @@ public class App {
         }
 
         scanner.close();
+        
+        // java.time パッケージを活用したタイムスタンプ機能
+        System.out.println("\n--- 実行情報 ---");
+
+        //　現在の時刻を取得（クラスメソッドの活用）
+        LocalDateTime now = LocalDateTime.now();
+
+        //わかりやすいフォーマットに変更
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm:ss");
+
+        // 指定したフォーマットで時刻を文字列に変換して出力(インスタンスメソッドの活用)
+        String formattedNow = now.format(formatter);
+        System.out.println("最終処理日時：" + formattedNow);
 
         System.out.println("\n実行に成功");
 
