@@ -13,11 +13,7 @@ import java.util.Scanner;
 // 時刻を扱うためのライブラリをインポート
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-// .csvファイルの読み込みを扱うためのライブラリ
-import java.io.BufferedReader;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.io.IOException;
+// フォルダ内のファイルを探すためのライブラリ
 import java.io.File;
 
 public class App {
@@ -63,30 +59,10 @@ public class App {
         File selectedFile = csvFiles[choice - 1];
         System.out.println("\n>>> 「" + selectedFile.getName() + "」を読み込みます...");
 
-        Path csvPath = selectedFile.toPath();
+        Dataloader loader = new CsvDataLoder();
+        performanceMap = loader.load(selectedFile);
 
-        try (BufferedReader br = Files.newBufferedReader(csvPath)) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                String[] data = line.split(",");
-                if (data.length >= 5) {
-                    String title = data[0];
-                    String performer = data[1];
-                    int duration = Integer.parseInt(data[2]);
-                    int bpm = Integer.parseInt(data[3]);
-                    String mood = data[4];
-
-                    Song song = new Song(title, performer, duration, bpm, mood);
-                    performanceMap.put(song.getTitle(), song);
-                }
-            }
-            System.out.println(">>> 読み込み完了！ 全" + performanceMap.size() + "件の演目をMapに登録しました。");
-
-        } catch (IOException e) {
-            System.out.println("エラー：.csvファイルの読み込みに失敗しました。ファイル名や場所を確認してください。");
-        } catch (NumberFormatException e) {
-            System.out.println("エラー：時間やBPMのデータを数値に変換できませんでした。.csvファイルの中身を確認してください。");
-        }
+        System.out.println(">>>読み込み完了 全" + performanceMap.size() + "件の演目をMapに登録しました。");
 
         // Scannerクラスを使った対話型の検索機能
         System.out.println("\n--- 演目の検索 ---");
