@@ -7,10 +7,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.HashMap;
-import java.util.Map;
 
-public class CsvDataLoader implements Dataloader {
+public class DataLoader_csv implements DataLoader {
 
     @Override
     public Map<String, Performance> load(File file) {

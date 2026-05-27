@@ -34,19 +34,19 @@ public class App {
         // .csvファイルから自動で読み込むコード
         File dataDir = new File("Data"); // Dataフォルダを指定
 
-        // フォルダ内から「.csv」で終わるファイルだけを集める
-        File[] csvFiles = dataDir.listFiles((dir, name) -> name.endsWith(".csv"));
+        // フォルダ内から「.csv」、または「.xlsx」で終わるファイルだけを集める
+        File[] targetFiles = dataDir.listFiles((dir, name) -> name.endsWith(".csv") || name.endsWith(".xlsx"));
 
         // フォルダが無い、.csvファイルがフォルダ内も1つもない場合のエラー処理
-        if (csvFiles == null || csvFiles.length == 0) {
+        if (targetFiles == null || targetFiles.length == 0) {
             System.out.println("Dataフォルダ内に.csvファイルが見つかりません。プログラムを終了します。");
             return; // ここで処理を終了する。
         }
 
         System.out.println(">>> 読み込む.csvファイルを選択してください。");
-        for (int i = 0; i < csvFiles.length; i++) {
+        for (int i = 0; i < targetFiles.length; i++) {
             // 「1: performances.csv」のように番号付きで表示
-            System.out.println((i + 1) + ": " + csvFiles[i].getName());
+            System.out.println((i + 1) + ": " + targetFiles[i].getName());
         }
 
         // 表示した選択肢の番号を受け付ける
@@ -56,10 +56,17 @@ public class App {
         scanner.nextLine(); // 数字を入力した後の「Enterキー(改行)」を空読みして捨てる
 
         // 入力された番号(１から始まる)を、配列のインデックス(0からはじまる)に直してファイルを取得
-        File selectedFile = csvFiles[choice - 1];
+        File selectedFile = targetFiles[choice - 1];
         System.out.println("\n>>> 「" + selectedFile.getName() + "」を読み込みます...");
 
-        Dataloader loader = new CsvDataLoader();
+        //選ばれたファイルの拡張子を見て、対応するクラスを呼び出す
+        DataLoader loader;
+        if (selectedFile.getName().endsWith(".xlsx")) {
+            loader = new DataLoader_Excel();
+        } else {
+            loader = new DataLoader_csv();
+        }
+
         performanceMap = loader.load(selectedFile);
 
         System.out.println(">>>読み込み完了 全" + performanceMap.size() + "件の演目をMapに登録しました。");
