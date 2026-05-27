@@ -59,7 +59,7 @@ public class App {
         File selectedFile = csvFiles[choice - 1];
         System.out.println("\n>>> 「" + selectedFile.getName() + "」を読み込みます...");
 
-        Dataloader loader = new CsvDataLoder();
+        Dataloader loader = new CsvDataLoader();
         performanceMap = loader.load(selectedFile);
 
         System.out.println(">>>読み込み完了 全" + performanceMap.size() + "件の演目をMapに登録しました。");

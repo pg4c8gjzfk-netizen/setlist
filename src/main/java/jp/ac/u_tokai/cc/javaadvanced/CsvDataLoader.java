@@ -10,7 +10,7 @@ import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 
-public class CsvDataLoder implements Dataloader {
+public class CsvDataLoader implements Dataloader {
 
     @Override
     public Map<String, Performance> load(File file) {
@@ -20,7 +20,7 @@ public class CsvDataLoder implements Dataloader {
         try (BufferedReader br = Files.newBufferedReader(file.toPath())) {
             String line;
             while ((line = br.readLine()) != null) {
-                String[] data = line.sprit(",");
+                String[] data = line.split(",");
                 if (data.length >= 5) {
                     String title = data[0];
                     String performer = data[1];
