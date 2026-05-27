@@ -59,7 +59,7 @@ public class App {
         File selectedFile = targetFiles[choice - 1];
         System.out.println("\n>>> 「" + selectedFile.getName() + "」を読み込みます...");
 
-        //選ばれたファイルの拡張子を見て、対応するクラスを呼び出す
+        // 選ばれたファイルの拡張子を見て、対応するクラスを呼び出す
         DataLoader loader;
         if (selectedFile.getName().endsWith(".xlsx")) {
             loader = new DataLoader_Excel();
