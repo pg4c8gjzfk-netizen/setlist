@@ -24,7 +24,24 @@ public class App {
      */
     public static void main(String[] args) {
 
-        System.out.println("=== セットリスト自動作成アプリ：Excelファイルデータ読み込みテスト ===\n");
+        System.out.println("=== セットリスト自動作成 ===\n");
+
+        int numberOfSessions = 0;
+        Scanner scanner = new Scanner(System.in);
+        
+        while (true) {
+            System.out.println("作成する公演回数を入力してください。：");
+            try {
+                numberOfSessions = Integer.parseInt(scanner.nextLine());
+                if (numberOfSessions > 0) {
+                    break;
+                } else {
+                    System.out.println("自然数を入力してください。");
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("※正しい数値を入力してください。");
+            }
+        }
 
         // Mapを用いて演目を整理する
         // Keyを「楽曲名/Title (String)」,Valueを「Performer」、「duration」などとするMapを用意
@@ -43,14 +60,13 @@ public class App {
             return; // ここで処理を終了する。
         }
 
-        System.out.println(">>> 読み込む.csvファイルを選択してください。");
+        System.out.println(">>> 読み込むファイルを選択してください。");
         for (int i = 0; i < targetFiles.length; i++) {
             // 「1: performances.csv」のように番号付きで表示
             System.out.println((i + 1) + ": " + targetFiles[i].getName());
         }
 
         // 表示した選択肢の番号を受け付ける
-        Scanner scanner = new Scanner(System.in);
         System.out.print("番号を入力：");
         int choice = scanner.nextInt();
         scanner.nextLine(); // 数字を入力した後の「Enterキー(改行)」を空読みして捨てる
@@ -82,9 +98,9 @@ public class App {
 
         System.out.println("\n検索中... 「" + searchKey + "」");
 
-       //検索クラスを呼び出して、検索と表示を任せる
-       DataSearcher searcher = new DataSearcher();
-       searcher.searchAndDisplay(performanceMap,searchKey);
+        // 検索クラスを呼び出して、検索と表示を任せる
+        DataSearcher searcher = new DataSearcher();
+        searcher.searchAndDisplay(performanceMap, searchKey);
 
         scanner.close();
 
