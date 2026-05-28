@@ -24,7 +24,7 @@ public class App {
      */
     public static void main(String[] args) {
 
-        System.out.println("=== セットリスト自動作成アプリ：CSVデータ読み込みテスト ===\n");
+        System.out.println("=== セットリスト自動作成アプリ：Excelファイルデータ読み込みテスト ===\n");
 
         // Mapを用いて演目を整理する
         // Keyを「楽曲名/Title (String)」,Valueを「Performer」、「duration」などとするMapを用意

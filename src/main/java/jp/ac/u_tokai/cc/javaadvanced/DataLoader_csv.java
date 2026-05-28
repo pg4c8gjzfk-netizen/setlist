@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.List;
+import java.util.ArrayList;
 
 public class DataLoader_csv implements DataLoader {
 
@@ -22,11 +24,16 @@ public class DataLoader_csv implements DataLoader {
                 if (data.length >= 5) {
                     String title = data[0];
                     String performer = data[1];
+                    
+                    List<String> performers = new ArrayList<>();
+                    performers.add(performer);
+
                     int duration = Integer.parseInt(data[2]);
+                    
                     int bpm = Integer.parseInt(data[3]);
                     String mood = data[4];
 
-                    Song song = new Song(title, performer, duration, bpm, mood);
+                    Song song = new Song(title, performers, duration, bpm, mood);
                     loadedMap.put(song.getTitle(), song);
                 }
             }

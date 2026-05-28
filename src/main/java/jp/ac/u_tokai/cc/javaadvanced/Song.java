@@ -1,5 +1,7 @@
 package jp.ac.u_tokai.cc.javaadvanced;
 
+import java.util.List;
+
 /**
  * 演目(Performance)を継承、自動生成に必要な要素を持つ楽曲用のクラス
  */
@@ -19,9 +21,9 @@ public class Song extends Performance {
      * @param BPM       テンポ
      * @param mood      雰囲気
      */
-    public Song(String title, String performer, int duration, int BPM, String mood) {
+    public Song(String title, List<String> performers, int duration, int BPM, String mood) {
         // 親クラス(Performance.java)に基本情報を渡して安全に初期化
-        super(title, performer, duration);
+        super(title, performers, duration);
 
         // BPMが常に非負整数であり、負整数の場合に"1"としてカプセル化
         if (BPM <= 0) {
