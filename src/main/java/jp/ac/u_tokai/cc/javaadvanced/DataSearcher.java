@@ -28,7 +28,7 @@ public class DataSearcher {
             // 登録されている曲名も小文字にして、キーワードが含まれているかチェック
             if (key.toLowerCase().contains(normalizedQuery)) {
                 Performance target = performanceMap.get(key);
-                System.out.print("【検索ヒット】");
+                System.out.print("\n【検索ヒット】");
                 target.show();
                 isFound = true;
             }

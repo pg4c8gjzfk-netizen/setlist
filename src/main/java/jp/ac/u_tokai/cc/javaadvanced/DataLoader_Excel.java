@@ -40,7 +40,7 @@ public class DataLoader_Excel implements DataLoader {
                 // 【安全装置】シート名に「メモ」や「予備」が含まれていたら読み飛ばす
                 if (sheetName.contains("メモ") || sheetName.contains("予備")) {
                     System.out.println("   ➡ シート「" + sheetName + "」はスキップします。");
-                    continue; 
+                    continue;
                 }
 
                 System.out.println("   ➡ シート「" + sheetName + "」の読み込みを開始します...");
@@ -50,7 +50,7 @@ public class DataLoader_Excel implements DataLoader {
 
                 // ヘッダーから演者名と列番号を記憶
                 Row headerRow = sheet.getRow(0);
-                if (headerRow == null){
+                if (headerRow == null) {
                     // 【変更】複数シート対応のため、return(完全終了)ではなくcontinue(次のシートへ)に変更
                     System.out.println("[デバッグ] シート「" + sheetName + "」の1行目が完全に存在しません！シートが空っぽの可能性大です。");
                     continue;
@@ -77,11 +77,12 @@ public class DataLoader_Excel implements DataLoader {
                 // lastRowNumを使わず、指定した maxRowNumber 未満までループする
                 for (int r = 1; r < maxRowNumber; r++) {
                     Row row = sheet.getRow(r);
-                    if (row == null) break; // 行自体が存在しなければ終了
+                    if (row == null)
+                        break; // 行自体が存在しなければ終了
 
                     // 1列目(インデックス0): 曲名
                     String title = formatter.formatCellValue(row.getCell(0));
-                    
+
                     // 【安全装置1】「合計」行に到達したら、演目ではないのでストップ！
                     if (title.equals("合計")) {
                         System.out.println("👀 [デバッグ] シート「" + sheetName + "」で「合計」行を検知したため、読み込みを終了します。");
@@ -98,16 +99,16 @@ public class DataLoader_Excel implements DataLoader {
                         // 2列目(インデックス1): 時間
                         String durationStr = formatter.formatCellValue(row.getCell(1)).trim();
                         int duration = 0;
-                        
+
                         if (!durationStr.isEmpty()) {
-                            String cleanTime = durationStr.replace("\"", "").replace("：",":");
+                            String cleanTime = durationStr.replace("\"", "").replace("：", ":");
 
                             if (cleanTime.contains(":")) {
                                 String[] timeParts = cleanTime.split(":");
                                 int min = Integer.parseInt(timeParts[0]);
                                 int sec = Integer.parseInt(timeParts[1]);
                                 duration = (min * 60) + sec;
-                            } else{
+                            } else {
                                 duration = Integer.parseInt(cleanTime);
                             }
                         }
@@ -117,7 +118,8 @@ public class DataLoader_Excel implements DataLoader {
                         for (int c = 2; c < lastColIndex; c++) {
                             String mark = formatter.formatCellValue(row.getCell(c)).trim();
                             // 記号の表記ゆれ対策
-                            if (mark.equals("◯") || mark.equals("○") || mark.equals("〇") || mark.equalsIgnoreCase("O")) {
+                            if (mark.equals("◯") || mark.equals("○") || mark.equals("〇")
+                                    || mark.equalsIgnoreCase("O")) {
                                 if (performanceMap.containsKey(c)) {
                                     performers.add(performanceMap.get(c));
                                 }
@@ -128,13 +130,60 @@ public class DataLoader_Excel implements DataLoader {
                         int bpm = 0;
                         String mood = "未指定";
 
-                        Song song = new Song(title, performers, duration, bpm, mood);
-                        loadedMap.put(song.getTitle(), song);
-                        
+                        // 【追加】全く同じメンバーの同じ演目かチェックするロジック
+                        boolean isDuplicate = false;
+
+                        // 順番を気にせずメンバーを比較するために HashSet を使います
+                        java.util.Set<String> newPerformersSet = new java.util.HashSet<>(performers);
+
+                        // 既に登録されている全演目をチェック
+                        for (Performance existing : loadedMap.values()) {
+                            // タイトルが同じ、または派生タイトル（"(_" で始まる）かチェック
+                            if (existing.getTitle().equals(title) || existing.getTitle().startsWith(title + "(_")) {
+
+                                java.util.Set<String> existingPerformersSet = new java.util.HashSet<>(
+                                        existing.getPerformers());
+
+                                // メンバーが完全に一致した場合は重複（同じ演目）とみなす
+                                if (existingPerformersSet.equals(newPerformersSet)) {
+                                    isDuplicate = true;
+                                    break; // 見つかったらこれ以上探す必要はないのでループを抜ける
+                                }
+                            }
+                        }
+
+                        // メンバーが一致した（重複した）場合は登録せずにスキップ
+                        if (isDuplicate) {
+                            System.out.println(
+                                    "👀 [デバッグ] シート「" + sheetName + "」の「" + title + "」は、既に同じメンバーで登録済みのためスキップしました。");
+                        } else {
+                            // メンバーが違う場合、または完全に新曲の場合は登録・リネーム処理へ
+                            String finalTitle = title;
+
+                            // もし辞書にすでに同じ名前が登録されていたら、後ろに (_シート名) を付ける
+                            if (loadedMap.containsKey(finalTitle)) {
+                                finalTitle = title + "(_" + sheetName + ")";
+
+                                // 万が一、同シート内に同じ曲名が複数あった場合の対策
+                                int version = 1;
+                                String tempTitle = finalTitle;
+                                while (loadedMap.containsKey(tempTitle)) {
+                                    version++;
+                                    tempTitle = finalTitle + " (ver" + version + ")";
+                                }
+                                finalTitle = tempTitle;
+                            }
+
+                            // Songを作成してMapに登録
+                            Song song = new Song(finalTitle, performers, duration, bpm, mood);
+                            loadedMap.put(song.getTitle(), song);
+                        }
+
                     } catch (NumberFormatException e) {
                         // 時間が数字でない行はスキップ
                         String errDuration = formatter.formatCellValue(row.getCell(1));
-                        System.out.println("👀 [デバッグ] " + (r + 1) + "行目の「" + title + "」をスキップしました！ 時間枠の [" + errDuration + "] が純粋な数字ではないためです。");
+                        System.out.println("👀 [デバッグ] " + (r + 1) + "行目の「" + title + "」をスキップしました！ 時間枠の [" + errDuration
+                                + "] が純粋な数字ではないためです。");
                     }
                 }
             } // ◀◀ 全シートを回る for ループの終わり
