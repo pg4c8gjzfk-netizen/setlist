@@ -82,14 +82,9 @@ public class App {
 
         System.out.println("\n検索中... 「" + searchKey + "」");
 
-        // 入力された文字(searchKey)を使ってMapを検索
-        if (performanceMap.containsKey(searchKey)) {
-            Performance target = performanceMap.get(searchKey);
-            System.out.print("【検索ヒット】");
-            target.show();
-        } else {
-            System.out.println("「" + searchKey + "」という演目は登録されていません。");
-        }
+       //検索クラスを呼び出して、検索と表示を任せる
+       DataSearcher searcher = new DataSearcher();
+       searcher.searchAndDisplay(performanceMap,searchKey);
 
         scanner.close();
 
