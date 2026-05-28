@@ -1,0 +1,11 @@
+# コンパイルされたファイル
+target/
+*.class
+
+# VS Codeの設定ファイル
+.vscode/
+
+# 個人情報を含むテストデータ（超重要！）
+Data/
+*.xlsx
+*.csv
