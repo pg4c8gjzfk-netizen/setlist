@@ -12,6 +12,12 @@ import java.util.ArrayList;
 
 public class DataLoader_csv implements DataLoader {
 
+    /**
+     * CSVファイルからデータを読み込み、Mapに格納して返す
+     * 
+     * @param file 読み込む対象のCSVファイル
+     * @return タイトルをキー、演目を値とするMap
+     */
     @Override
     public Map<String, Performance> load(File file) {
         // 読み込んだデータを格納するための空のMapを用意
@@ -24,12 +30,12 @@ public class DataLoader_csv implements DataLoader {
                 if (data.length >= 5) {
                     String title = data[0];
                     String performer = data[1];
-                    
+
                     List<String> performers = new ArrayList<>();
                     performers.add(performer);
 
                     int duration = Integer.parseInt(data[2]);
-                    
+
                     int bpm = Integer.parseInt(data[3]);
                     String mood = data[4];
 

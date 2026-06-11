@@ -9,7 +9,8 @@ public class DataSearcher {
 
     /**
      * Mapの中からキーワードに一致する演目を検索し、結果を表示する
-     * * @param performanceMap 検索対象の全データが入ったMap
+     * 
+     * @param performanceMap 検索対象の全データが入ったMap
      * @param searchKey      検索するキーワード
      */
     public void searchAndDisplay(Map<String, Performance> performanceMap, String searchKey) {

@@ -20,6 +20,14 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class DataLoader_Excel implements DataLoader {
 
+    /**
+     * Excelファイルからデータを読み込み、Mapに格納して返します。
+     * 重複データの排除や、シートごとのリネーム処理を含みます。
+     * 
+     * @param file 読み込み対象のExcelファイル
+     * @return タイトルをキー、演目を値とするMap
+     */
+
     @Override
     public Map<String, Performance> load(File file) {
         Map<String, Performance> loadedMap = new HashMap<>();

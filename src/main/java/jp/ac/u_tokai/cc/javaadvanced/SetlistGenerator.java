@@ -9,7 +9,12 @@ import java.util.Map;
  */
 public class SetlistGenerator {
 
-    // 公演回数（numberOfSessions）を受け取るように引数を追加
+    /**
+     * 読み込まれた全演目データをもとに、指定された公演回数分のセットリスト枠を生成します。
+     * 
+     * @param allPerformances  全ての演目データが格納されたMap
+     * @param numberOfSessions 作成する公演回数
+     */
     public void generate(Map<String, Performance> allPerformances, int numberOfSessions) {
         System.out.println("\n=== セットリストの自動生成を開始します ===");
 
@@ -20,13 +25,13 @@ public class SetlistGenerator {
         for (int i = 0; i < numberOfSessions; i++) {
             sessions.add(new ArrayList<>());
         }
-        
+
         System.out.println("👀 [システム] " + numberOfSessions + " 公演分の空の枠を用意しました！");
 
         // --- 今後のアルゴリズム構築用スペース ---
-        
+
         // TODO: 絶対条件の処理（help!!の固定など）
-        
+
         // TODO: 配慮条件の処理（連続回避と割り振り）
 
         System.out.println("（アルゴリズム構築中...）");
