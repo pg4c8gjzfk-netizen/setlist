@@ -170,21 +170,8 @@ public class SetlistScreen extends JFrame {
      * @return 読み込んだ演目データ
      */
     private Map<String, Performance> loadPerformances(File selectedFile) {
-        DataLoader loader = createLoader(selectedFile);
+        DataLoader loader = DataLoaderFactory.create(selectedFile);
         return loader.load(selectedFile);
-    }
-
-    /**
-     * ファイル拡張子に応じた読み込みクラスを作成します。
-     *
-     * @param selectedFile 読み込み対象のファイル
-     * @return データ読み込み用クラス
-     */
-    private DataLoader createLoader(File selectedFile) {
-        if (selectedFile.getName().endsWith(".xlsx")) {
-            return new ExcelDataLoader();
-        }
-        return new CsvDataLoader();
     }
 
     /**

@@ -43,7 +43,7 @@ public class SetlistApplication {
             return;
         }
 
-        DataLoader loader = createLoader(selectedFile);
+        DataLoader loader = DataLoaderFactory.create(selectedFile);
         Map<String, Performance> performanceMap = loader.load(selectedFile);
         if (performanceMap.isEmpty()) {
             System.out.println("読み込める演目データがありませんでした。プログラムを終了します。");
@@ -91,16 +91,6 @@ public class SetlistApplication {
         File selectedFile = targetFiles[choice - 1];
         System.out.println("\n>>> 「" + selectedFile.getName() + "」を読み込みます...");
         return selectedFile;
-    }
-
-    /**
-     * ファイル拡張子に応じたローダーを作成します。
-     */
-    private DataLoader createLoader(File selectedFile) {
-        if (selectedFile.getName().endsWith(".xlsx")) {
-            return new ExcelDataLoader();
-        }
-        return new CsvDataLoader();
     }
 
     /**
