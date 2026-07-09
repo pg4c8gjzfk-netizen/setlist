@@ -2,7 +2,6 @@ package jp.ac.u_tokai.cc.javaadvanced;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
-import java.awt.GraphicsEnvironment;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +17,6 @@ import javax.swing.JSpinner;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
-import javax.swing.SwingUtilities;
 
 /**
  * セットリスト自動生成アプリを画面で操作するためのクラス。
@@ -284,26 +282,4 @@ public class SetlistScreen extends JFrame {
         setVisible(true);
     }
 
-    /**
-     * 画面が利用できる環境ではSwing画面を起動し、利用できない環境ではコンソール版を起動します。
-     *
-     * @param args 起動引数。--consoleを指定するとコンソール版を起動します
-     */
-    public static void main(String[] args) {
-        if (GraphicsEnvironment.isHeadless() || hasConsoleOption(args)) {
-            new SetlistApplication().run();
-            return;
-        }
-        SwingUtilities.invokeLater(() -> new SetlistScreen().showScreen());
-    }
-
-    /**
-     * コンソール版起動オプションが指定されているか判定します。
-     *
-     * @param args 起動引数
-     * @return --consoleが指定されている場合はtrue
-     */
-    private static boolean hasConsoleOption(String[] args) {
-        return args != null && args.length > 0 && "--console".equals(args[0]);
-    }
 }
