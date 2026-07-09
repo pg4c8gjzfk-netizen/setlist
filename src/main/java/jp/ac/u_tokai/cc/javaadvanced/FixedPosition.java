@@ -5,11 +5,22 @@ package jp.ac.u_tokai.cc.javaadvanced;
  */
 public enum FixedPosition {
     /** 特定の位置に固定しません。 */
-    NONE,
+    NONE("通常"),
     /** 公演の先頭に固定します。 */
-    OPENING,
+    OPENING("オープニング"),
     /** 公演の末尾に固定します。 */
-    CLOSING,
+    CLOSING("トリ"),
     /** 指定したインデックスに固定します。 */
-    INDEX
+    INDEX("位置固定");
+
+    private final String displayName;
+
+    FixedPosition(String displayName) {
+        this.displayName = displayName;
+    }
+
+    @Override
+    public String toString() {
+        return displayName;
+    }
 }

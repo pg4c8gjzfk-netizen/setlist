@@ -5,7 +5,6 @@ import java.awt.FlowLayout;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
-
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
@@ -18,10 +17,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
 
-/**
- * セットリスト自動生成アプリを画面で操作するためのクラス。
- * Dataフォルダ内のファイル選択、生成条件の入力、生成結果の表示、Excel/CSV保存を画面から実行します。
- */
+/** 自動生成、編集画面への遷移、既存形式での出力を行うメイン画面です。 */
 public class SetlistFrame extends JFrame {
     private static final long serialVersionUID = 1L;
     private static final String DATA_DIRECTORY = "Data";
@@ -32,11 +28,11 @@ public class SetlistFrame extends JFrame {
     private final JTextField openerField;
     private final JTextField closerField;
     private final JTextArea resultArea;
+    private final JButton editButton;
     private List<List<Performance>> generatedSessions;
+    private SetlistProject currentProject;
 
-    /**
-     * セットリスト生成画面を初期化します。
-     */
+    /** メイン画面を作成します。 */
     public SetlistFrame() {
         super("セットリスト自動生成");
         this.dataFileBox = new JComboBox<>();
@@ -45,147 +41,124 @@ public class SetlistFrame extends JFrame {
         this.openerField = new JTextField(12);
         this.closerField = new JTextField(12);
         this.resultArea = new JTextArea(22, 70);
+        this.editButton = new JButton("編集");
         this.generatedSessions = List.of();
+        this.currentProject = SetlistProjectFactory.newEmptyProject();
 
         setupWindow();
         loadDataFiles();
     }
 
-    /**
-     * 画面部品を配置し、ウィンドウの基本設定を行います。
-     */
     private void setupWindow() {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout(8, 8));
-
-        this.resultArea.setEditable(false);
-        this.resultArea.setLineWrap(false);
+        resultArea.setEditable(false);
+        resultArea.setLineWrap(false);
+        editButton.setEnabled(false);
 
         add(createInputPanel(), BorderLayout.NORTH);
-        add(new JScrollPane(this.resultArea), BorderLayout.CENTER);
+        add(new JScrollPane(resultArea), BorderLayout.CENTER);
         add(createActionPanel(), BorderLayout.SOUTH);
-
         pack();
         setLocationRelativeTo(null);
     }
 
-    /**
-     * ファイル選択や生成条件を入力するパネルを作成します。
-     *
-     * @return 入力用パネル
-     */
     private JPanel createInputPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panel.add(new JLabel("データファイル"));
-        panel.add(this.dataFileBox);
+        panel.add(dataFileBox);
         panel.add(new JLabel("公演数"));
-        panel.add(this.sessionSpinner);
-        panel.add(new JLabel("各公演の曲数"));
-        panel.add(this.capacityField);
+        panel.add(sessionSpinner);
+        panel.add(new JLabel("各公演の上限数"));
+        panel.add(capacityField);
         panel.add(new JLabel("オープニング"));
-        panel.add(this.openerField);
+        panel.add(openerField);
         panel.add(new JLabel("トリ"));
-        panel.add(this.closerField);
+        panel.add(closerField);
         return panel;
     }
 
-    /**
-     * 生成や保存を実行するボタンを配置したパネルを作成します。
-     *
-     * @return 操作用パネル
-     */
     private JPanel createActionPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton reloadButton = new JButton("再読込");
         JButton generateButton = new JButton("生成");
-        JButton excelButton = new JButton("Excel保存");
-        JButton csvButton = new JButton("CSV保存");
+        JButton newButton = new JButton("新規作成");
+        JButton excelButton = new JButton("Excel出力");
+        JButton csvButton = new JButton("CSV出力");
 
         reloadButton.addActionListener(event -> loadDataFiles());
         generateButton.addActionListener(event -> generateSetlist());
+        newButton.addActionListener(event -> openEditor(SetlistProjectFactory.newEmptyProject()));
+        editButton.addActionListener(event -> openEditor(currentProject));
         excelButton.addActionListener(event -> exportGeneratedSetlist(new XlsxSetlistExporter(), "output_setlist.xlsx"));
         csvButton.addActionListener(event -> exportGeneratedSetlist(new CsvSetlistExporter(), "output_setlist.csv"));
 
         panel.add(reloadButton);
         panel.add(generateButton);
+        panel.add(newButton);
+        panel.add(editButton);
         panel.add(excelButton);
         panel.add(csvButton);
         return panel;
     }
 
-    /**
-     * DataフォルダからCSVまたはExcelファイルを読み込み、選択欄に反映します。
-     */
     private void loadDataFiles() {
-        this.dataFileBox.removeAllItems();
+        dataFileBox.removeAllItems();
         File dataDir = new File(DATA_DIRECTORY);
-        File[] files = dataDir.listFiles((dir, name) -> name.endsWith(".csv") || name.endsWith(".xlsx"));
+        File[] files = dataDir.listFiles((directory, name) -> name.endsWith(".csv") || name.endsWith(".xlsx"));
         if (files == null || files.length == 0) {
-            this.resultArea.setText("Dataフォルダに.csvまたは.xlsxファイルがありません。");
+            resultArea.setText("Dataフォルダに .csv または .xlsx ファイルがありません。");
             return;
         }
-
         for (File file : files) {
-            this.dataFileBox.addItem(file);
+            dataFileBox.addItem(file);
         }
-        this.resultArea.setText("データファイルを選択して、生成ボタンを押してください。");
+        resultArea.setText("データファイルを選択して、生成ボタンを押してください。");
     }
 
-    /**
-     * 画面で入力された条件をもとにセットリストを生成し、結果欄へ表示します。
-     */
     private void generateSetlist() {
-        File selectedFile = (File) this.dataFileBox.getSelectedItem();
+        File selectedFile = (File) dataFileBox.getSelectedItem();
         if (selectedFile == null) {
             showError("読み込むデータファイルを選択してください。");
             return;
         }
 
-        int numberOfSessions = (Integer) this.sessionSpinner.getValue();
         Map<String, Performance> performances = loadPerformances(selectedFile);
         if (performances.isEmpty()) {
             showError("演目データを読み込めませんでした。");
             return;
         }
 
+        int numberOfSessions = (Integer) sessionSpinner.getValue();
         int[] capacities;
         try {
             capacities = createCapacities(numberOfSessions);
-        } catch (NumberFormatException e) {
-            showError("各公演の曲数には1以上の数字を入力してください。");
+        } catch (NumberFormatException exception) {
+            showError("各公演の上限数には1以上の整数を入力してください。");
             return;
         }
-        String[] openers = createRepeatedValues(this.openerField.getText(), numberOfSessions);
-        String[] closers = createRepeatedValues(this.closerField.getText(), numberOfSessions);
 
-        SetlistGenerator generator = new SetlistGenerator();
-        this.generatedSessions = generator.generate(performances, numberOfSessions, capacities, openers, closers);
-        this.resultArea.setText(formatSessions(this.generatedSessions));
+        generatedSessions = new SetlistGenerator().generate(
+                performances,
+                numberOfSessions,
+                capacities,
+                createRepeatedValues(openerField.getText(), numberOfSessions),
+                createRepeatedValues(closerField.getText(), numberOfSessions));
+        currentProject = SetlistProjectFactory.fromGeneratedSessions(generatedSessions);
+        editButton.setEnabled(!currentProject.sessions().isEmpty());
+        resultArea.setText(formatProject(currentProject));
     }
 
-    /**
-     * 選択されたファイルから演目データを読み込みます。
-     *
-     * @param selectedFile 読み込み対象のファイル
-     * @return 読み込んだ演目データ
-     */
     private Map<String, Performance> loadPerformances(File selectedFile) {
         PerformanceDataReader loader = PerformanceReaderFactory.create(selectedFile);
         return loader.load(selectedFile);
     }
 
-    /**
-     * 画面の曲数入力から各公演の曲数上限を作成します。
-     *
-     * @param numberOfSessions 公演数
-     * @return 曲数上限。未入力の場合はnull
-     */
     private int[] createCapacities(int numberOfSessions) {
-        String capacityText = this.capacityField.getText().trim();
+        String capacityText = capacityField.getText().trim();
         if (capacityText.isEmpty()) {
             return null;
         }
-
         int capacity = Integer.parseInt(capacityText);
         if (capacity <= 0) {
             throw new NumberFormatException("capacity must be positive");
@@ -197,13 +170,6 @@ public class SetlistFrame extends JFrame {
         return capacities;
     }
 
-    /**
-     * 1つの入力値を公演数分の配列にして返します。
-     *
-     * @param value            画面から入力された文字列
-     * @param numberOfSessions 公演数
-     * @return 公演数分の文字列配列
-     */
     private String[] createRepeatedValues(String value, int numberOfSessions) {
         String[] values = new String[numberOfSessions];
         for (int i = 0; i < numberOfSessions; i++) {
@@ -212,61 +178,52 @@ public class SetlistFrame extends JFrame {
         return values;
     }
 
-    /**
-     * 生成済みセットリストを指定された形式でファイルへ保存します。
-     *
-     * @param exporter 保存処理を行うクラス
-     * @param fileName 保存先ファイル名
-     */
-    private void exportGeneratedSetlist(SetlistExporter exporter, String fileName) {
-        if (this.generatedSessions == null || this.generatedSessions.isEmpty()) {
-            showError("先にセットリストを生成してください。");
-            return;
-        }
-
-        exporter.export(this.generatedSessions, fileName);
-        JOptionPane.showMessageDialog(this, "Dataフォルダに保存しました: " + fileName);
+    private void openEditor(SetlistProject project) {
+        currentProject = project;
+        editButton.setEnabled(true);
+        SetlistEditorFrame editor = new SetlistEditorFrame(project, updatedProject -> {
+            currentProject = updatedProject;
+            resultArea.setText(formatProject(updatedProject));
+        });
+        editor.setVisible(true);
     }
 
-    /**
-     * 生成結果を画面表示用の文字列に変換します。
-     *
-     * @param sessions 生成されたセットリスト
-     * @return 表示用文字列
-     */
-    private String formatSessions(List<List<Performance>> sessions) {
+    private void exportGeneratedSetlist(SetlistExporter exporter, String fileName) {
+        if (generatedSessions.isEmpty()) {
+            showError("先にセットリストを生成してください。編集画面の保存機能は次の更新で利用できます。");
+            return;
+        }
+        exporter.export(generatedSessions, fileName);
+        JOptionPane.showMessageDialog(this, "Dataフォルダに出力しました: " + fileName);
+    }
+
+    private String formatProject(SetlistProject project) {
         StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < sessions.size(); i++) {
-            builder.append("【第").append(i + 1).append("公演】\n");
-            List<Performance> session = sessions.get(i);
-            for (int j = 0; j < session.size(); j++) {
-                Performance performance = session.get(j);
-                builder.append(j + 1)
+        for (SetlistSession session : project.sessions()) {
+            builder.append("【").append(session.name()).append("】\n");
+            for (int index = 0; index < session.entries().size(); index++) {
+                SetlistEntry entry = session.entries().get(index);
+                builder.append(index + 1)
                         .append(". ")
-                        .append(performance.getDisplayTitle())
+                        .append(entry.title())
                         .append(" / ")
-                        .append(String.join(", ", performance.getPerformers()))
-                        .append('\n');
+                        .append(String.join(", ", entry.performers()));
+                if (entry.fixed()) {
+                    builder.append(" [固定: ").append(entry.fixedPosition()).append("]");
+                }
+                builder.append('\n');
             }
             builder.append('\n');
         }
         return builder.toString();
     }
 
-    /**
-     * エラーメッセージを画面に表示します。
-     *
-     * @param message 表示するエラーメッセージ
-     */
     private void showError(String message) {
         JOptionPane.showMessageDialog(this, message, "エラー", JOptionPane.ERROR_MESSAGE);
     }
 
-    /**
-     * セットリスト生成画面を表示します。
-     */
+    /** メイン画面を表示します。 */
     public void showScreen() {
         setVisible(true);
     }
-
 }
