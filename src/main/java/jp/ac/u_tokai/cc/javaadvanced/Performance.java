@@ -1,70 +1,59 @@
 package jp.ac.u_tokai.cc.javaadvanced;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
- * セットリストの演目を管理するクラス
+ * セットリストで扱う1つの演目を管理するクラス。
  */
-
 public class Performance {
+    /** 出演者未設定時に使う表示名。 */
+    public static final String NO_PERFORMER = "noPerformer";
+
     /** 演目名 */
-    private String title;
+    private final String title;
     /** 出演者名 */
-    private List<String> performers;
-    /** 演目の所要時間（単位：分） */
-    private int duration;
+    private final List<String> performers;
+    /** 演目の所要時間（単位：秒） */
+    private final int duration;
 
     /**
-     * コンストラクタ(カプセル化によるガード付き)
-     * 
-     * @param title     演目名
-     * @param performer 演者名
-     * @param duration  所要時間（分）
+     * 演目を初期化します。
+     *
+     * @param title      演目名
+     * @param performers 演者名一覧
+     * @param duration   所要時間（秒）
      */
-
-    // 不正なデータをはじいてカプセル化を強化
     public Performance(String title, List<String> performers, int duration) {
-        // 演目名が未設定の場合の処理
-        if (title == null || title.isEmpty()) {
+        if (title == null || title.trim().isEmpty()) {
             this.title = "Untitled";
         } else {
-            this.title = title;
+            this.title = title.trim();
         }
 
-        // 演者がいない場合の処理
         if (performers == null || performers.isEmpty()) {
             this.performers = new ArrayList<>();
-            this.performers.add("noPerformer");
+            this.performers.add(NO_PERFORMER);
         } else {
-            this.performers = performers;
+            this.performers = new ArrayList<>(performers);
         }
 
-        // 所要時間が常に非負になるように補正
-        if (duration < 0) {
-            this.duration = 0;
-        } else {
-            this.duration = duration;
-        }
+        this.duration = Math.max(duration, 0);
     }
 
     /**
-     * 演目情報を表示
+     * 演目情報を表示します。
      */
     public void show() {
         System.out.println("\n演目:" + this.title);
-        
-        int m = this.duration / 60;
-        int s = this.duration % 60;
-        // %d は普通の数字、%02d は「１桁なら頭に０をつける」処理
-        String formatteredTime = String.format("%d:%02d", m, s);
-        System.out.println("時間：" + formatteredTime);
+        System.out.println("時間：" + formatDuration());
         System.out.println("演者:" + String.join(",", this.performers));
     }
 
     /**
-     * タイトルの取得
-     * 
+     * 演目名を取得します。
+     *
      * @return 演目名
      */
     public String getTitle() {
@@ -72,20 +61,40 @@ public class Performance {
     }
 
     /**
-     * 演者名の取得
-     * 
-     * @return 演者名
+     * 表示用の演目名を取得します。
+     *
+     * @return 派生名を除いた演目名
      */
-    public List<String> getPerformers() {
-        return this.performers;
+    public String getDisplayTitle() {
+        return this.title.split("\\(_")[0];
     }
 
     /**
-     * 所要時間の取得
-     * 
-     * @return 所要時間（分）
+     * 演者名を取得します。
+     *
+     * @return 演者名一覧
+     */
+    public List<String> getPerformers() {
+        return Collections.unmodifiableList(this.performers);
+    }
+
+    /**
+     * 所要時間を取得します。
+     *
+     * @return 所要時間（秒）
      */
     public int getDuration() {
         return this.duration;
+    }
+
+    /**
+     * 所要時間を分:秒の形式に変換します。
+     *
+     * @return 分:秒の文字列
+     */
+    private String formatDuration() {
+        int minutes = this.duration / 60;
+        int seconds = this.duration % 60;
+        return String.format("%d:%02d", minutes, seconds);
     }
 }
