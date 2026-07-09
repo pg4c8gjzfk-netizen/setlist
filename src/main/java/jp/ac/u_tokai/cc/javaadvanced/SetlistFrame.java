@@ -3,11 +3,13 @@ package jp.ac.u_tokai.cc.javaadvanced;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -16,6 +18,7 @@ import javax.swing.JSpinner;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.filechooser.FileNameExtensionFilter;
 
 /** 自動生成、編集画面への遷移、既存形式での出力を行うメイン画面です。 */
 public class SetlistFrame extends JFrame {
@@ -83,12 +86,14 @@ public class SetlistFrame extends JFrame {
         JButton reloadButton = new JButton("再読込");
         JButton generateButton = new JButton("生成");
         JButton newButton = new JButton("新規作成");
+        JButton openProjectButton = new JButton("編集済みXLSXを開く");
         JButton excelButton = new JButton("Excel出力");
         JButton csvButton = new JButton("CSV出力");
 
         reloadButton.addActionListener(event -> loadDataFiles());
         generateButton.addActionListener(event -> generateSetlist());
         newButton.addActionListener(event -> openEditor(SetlistProjectFactory.newEmptyProject()));
+        openProjectButton.addActionListener(event -> openSavedProject());
         editButton.addActionListener(event -> openEditor(currentProject));
         excelButton.addActionListener(event -> exportGeneratedSetlist(new XlsxSetlistExporter(), "output_setlist.xlsx"));
         csvButton.addActionListener(event -> exportGeneratedSetlist(new CsvSetlistExporter(), "output_setlist.csv"));
@@ -96,6 +101,7 @@ public class SetlistFrame extends JFrame {
         panel.add(reloadButton);
         panel.add(generateButton);
         panel.add(newButton);
+        panel.add(openProjectButton);
         panel.add(editButton);
         panel.add(excelButton);
         panel.add(csvButton);
@@ -186,6 +192,21 @@ public class SetlistFrame extends JFrame {
             resultArea.setText(formatProject(updatedProject));
         });
         editor.setVisible(true);
+    }
+
+    private void openSavedProject() {
+        JFileChooser chooser = new JFileChooser(new File("Data/output"));
+        chooser.setDialogTitle("編集可能な香盤表XLSXを開く");
+        chooser.setFileFilter(new FileNameExtensionFilter("Excelファイル (*.xlsx)", "xlsx"));
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        try {
+            SetlistProject loadedProject = new XlsxSetlistProjectReader().read(chooser.getSelectedFile());
+            openEditor(loadedProject);
+        } catch (IOException | IllegalArgumentException exception) {
+            showError("編集可能な香盤表XLSXを開けませんでした: " + exception.getMessage());
+        }
     }
 
     private void exportGeneratedSetlist(SetlistExporter exporter, String fileName) {

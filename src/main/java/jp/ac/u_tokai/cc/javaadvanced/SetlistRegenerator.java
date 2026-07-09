@@ -47,7 +47,7 @@ public final class SetlistRegenerator {
      */
     public SetlistProject regenerate(SetlistProject currentProject) {
         Objects.requireNonNull(currentProject, "currentProject must not be null");
-        validateUniqueEntryIds(currentProject);
+        validate(currentProject);
 
         List<SessionLayout> layouts = new ArrayList<>();
         List<SetlistEntry> movableEntries = new ArrayList<>();
@@ -65,6 +65,20 @@ public final class SetlistRegenerator {
         SetlistProject regeneratedProject = new SetlistProject(regeneratedSessions);
         verifyEntriesPreserved(currentProject, regeneratedProject);
         return regeneratedProject;
+    }
+
+    /**
+     * 現在の編集状態が再生成可能かを検証します。
+     *
+     * @param currentProject 検証対象のプロジェクト
+     * @throws IllegalArgumentException 固定条件または演目IDが矛盾している場合
+     */
+    public void validate(SetlistProject currentProject) {
+        Objects.requireNonNull(currentProject, "currentProject must not be null");
+        validateUniqueEntryIds(currentProject);
+        for (SetlistSession session : currentProject.sessions()) {
+            createLayout(session, new ArrayList<>());
+        }
     }
 
     private SessionLayout createLayout(SetlistSession session, List<SetlistEntry> movableEntries) {
