@@ -20,11 +20,11 @@ public class App {
      */
     public static void main(String[] args) {
         if (GraphicsEnvironment.isHeadless() || hasConsoleOption(args)) {
-            new SetlistApplication().run();
+            new ConsoleSetlistApplication().run();
             return;
         }
 
-        SwingUtilities.invokeLater(() -> new SetlistScreen().showScreen());
+        SwingUtilities.invokeLater(() -> new SetlistFrame().showScreen());
     }
 
     /**

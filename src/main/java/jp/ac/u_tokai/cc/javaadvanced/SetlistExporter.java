@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * 生成されたセットリストを外部ファイルへ保存するための共通インターフェース。
  */
-public interface DataExporter {
+public interface SetlistExporter {
     /**
      * セットリストを指定されたファイル名で保存します。
      *

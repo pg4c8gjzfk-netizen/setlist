@@ -6,7 +6,7 @@ import java.util.Map;
 /**
  * ファイルから演目データを読み込むための共通インターフェース。
  */
-public interface DataLoader {
+public interface PerformanceDataReader {
     /**
      * 指定されたファイルから演目データを読み込みます。
      *

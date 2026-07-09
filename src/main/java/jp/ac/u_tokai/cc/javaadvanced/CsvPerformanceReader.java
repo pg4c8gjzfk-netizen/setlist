@@ -12,7 +12,7 @@ import java.util.Map;
 /**
  * CSVファイルから演目データを読み込むクラス。
  */
-public class CsvDataLoader implements DataLoader {
+public class CsvPerformanceReader implements PerformanceDataReader {
 
     /**
      * CSVファイルからデータを読み込み、Mapに格納して返します。

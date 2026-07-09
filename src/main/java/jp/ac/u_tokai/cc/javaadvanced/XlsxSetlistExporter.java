@@ -13,7 +13,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 /**
  * 生成されたセットリストをExcelファイル（.xlsx）として保存するクラス。
  */
-public class ExcelDataExporter implements DataExporter {
+public class XlsxSetlistExporter implements SetlistExporter {
 
     /**
      * 生成されたセットリストをExcelファイルに書き出します。

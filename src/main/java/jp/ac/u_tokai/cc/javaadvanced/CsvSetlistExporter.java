@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * 生成されたセットリストをCSVファイルとして保存するクラス。
  */
-public class CsvDataExporter implements DataExporter {
+public class CsvSetlistExporter implements SetlistExporter {
 
     /**
      * 生成されたセットリストをCSVファイルに書き出します。

@@ -7,9 +7,9 @@ import java.util.Objects;
 /**
  * 入力ファイルの拡張子に対応するデータローダーを生成します。
  */
-public final class DataLoaderFactory {
+public final class PerformanceReaderFactory {
 
-    private DataLoaderFactory() {
+    private PerformanceReaderFactory() {
         // ファクトリークラスのためインスタンス化しません。
     }
 
@@ -20,15 +20,15 @@ public final class DataLoaderFactory {
      * @return 対応するデータローダー
      * @throws IllegalArgumentException 対応していない拡張子の場合
      */
-    public static DataLoader create(File file) {
+    public static PerformanceDataReader create(File file) {
         Objects.requireNonNull(file, "file must not be null");
 
         String fileName = file.getName().toLowerCase(Locale.ROOT);
         if (fileName.endsWith(".xlsx")) {
-            return new ExcelDataLoader();
+            return new XlsxPerformanceReader();
         }
         if (fileName.endsWith(".csv")) {
-            return new CsvDataLoader();
+            return new CsvPerformanceReader();
         }
 
         throw new IllegalArgumentException(

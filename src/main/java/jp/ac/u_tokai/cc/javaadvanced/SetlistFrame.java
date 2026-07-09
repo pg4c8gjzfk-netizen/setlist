@@ -22,7 +22,7 @@ import javax.swing.SpinnerNumberModel;
  * セットリスト自動生成アプリを画面で操作するためのクラス。
  * Dataフォルダ内のファイル選択、生成条件の入力、生成結果の表示、Excel/CSV保存を画面から実行します。
  */
-public class SetlistScreen extends JFrame {
+public class SetlistFrame extends JFrame {
     private static final long serialVersionUID = 1L;
     private static final String DATA_DIRECTORY = "Data";
 
@@ -37,7 +37,7 @@ public class SetlistScreen extends JFrame {
     /**
      * セットリスト生成画面を初期化します。
      */
-    public SetlistScreen() {
+    public SetlistFrame() {
         super("セットリスト自動生成");
         this.dataFileBox = new JComboBox<>();
         this.sessionSpinner = new JSpinner(new SpinnerNumberModel(2, 1, 20, 1));
@@ -103,8 +103,8 @@ public class SetlistScreen extends JFrame {
 
         reloadButton.addActionListener(event -> loadDataFiles());
         generateButton.addActionListener(event -> generateSetlist());
-        excelButton.addActionListener(event -> exportGeneratedSetlist(new ExcelDataExporter(), "output_setlist.xlsx"));
-        csvButton.addActionListener(event -> exportGeneratedSetlist(new CsvDataExporter(), "output_setlist.csv"));
+        excelButton.addActionListener(event -> exportGeneratedSetlist(new XlsxSetlistExporter(), "output_setlist.xlsx"));
+        csvButton.addActionListener(event -> exportGeneratedSetlist(new CsvSetlistExporter(), "output_setlist.csv"));
 
         panel.add(reloadButton);
         panel.add(generateButton);
@@ -170,7 +170,7 @@ public class SetlistScreen extends JFrame {
      * @return 読み込んだ演目データ
      */
     private Map<String, Performance> loadPerformances(File selectedFile) {
-        DataLoader loader = DataLoaderFactory.create(selectedFile);
+        PerformanceDataReader loader = PerformanceReaderFactory.create(selectedFile);
         return loader.load(selectedFile);
     }
 
@@ -218,7 +218,7 @@ public class SetlistScreen extends JFrame {
      * @param exporter 保存処理を行うクラス
      * @param fileName 保存先ファイル名
      */
-    private void exportGeneratedSetlist(DataExporter exporter, String fileName) {
+    private void exportGeneratedSetlist(SetlistExporter exporter, String fileName) {
         if (this.generatedSessions == null || this.generatedSessions.isEmpty()) {
             showError("先にセットリストを生成してください。");
             return;

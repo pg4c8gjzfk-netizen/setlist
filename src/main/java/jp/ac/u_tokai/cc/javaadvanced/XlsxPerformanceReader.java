@@ -18,7 +18,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 /**
  * Excelファイル（.xlsx）から演目データを読み込むクラス。
  */
-public class ExcelDataLoader implements DataLoader {
+public class XlsxPerformanceReader implements PerformanceDataReader {
     private static final int FIRST_PERFORMER_COLUMN = 2;
     private static final int MAX_ROW_NUMBER = 50;
 

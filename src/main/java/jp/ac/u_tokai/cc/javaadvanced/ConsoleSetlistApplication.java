@@ -13,7 +13,7 @@ import java.util.Scanner;
  * コンソール操作、ファイル入出力、セットリスト生成の流れを管理するクラス。
  * Appクラスに処理を詰め込まず、実際のアプリケーションとして使いやすい単位に分けています。
  */
-public class SetlistApplication {
+public class ConsoleSetlistApplication {
     private static final String DATA_DIRECTORY = "Data";
     private static final String EXCEL_OUTPUT_FILE = "output_setlist.xlsx";
     private static final String CSV_OUTPUT_FILE = "output_setlist.csv";
@@ -25,7 +25,7 @@ public class SetlistApplication {
     /**
      * 標準入力を使うコンソールアプリとして初期化します。
      */
-    public SetlistApplication() {
+    public ConsoleSetlistApplication() {
         this.scanner = new Scanner(System.in);
         this.searcher = new PerformanceSearcher();
         this.generator = new SetlistGenerator();
@@ -43,7 +43,7 @@ public class SetlistApplication {
             return;
         }
 
-        DataLoader loader = DataLoaderFactory.create(selectedFile);
+        PerformanceDataReader loader = PerformanceReaderFactory.create(selectedFile);
         Map<String, Performance> performanceMap = loader.load(selectedFile);
         if (performanceMap.isEmpty()) {
             System.out.println("読み込める演目データがありませんでした。プログラムを終了します。");
@@ -222,13 +222,13 @@ public class SetlistApplication {
         System.out.println("2: CSVファイル (.csv)   ※1つのファイルに全公演を連続して出力します");
 
         int exportChoice = readMenuChoice("番号を入力：", 1, 2);
-        DataExporter exporter;
+        SetlistExporter exporter;
         String fileName;
         if (exportChoice == 2) {
-            exporter = new CsvDataExporter();
+            exporter = new CsvSetlistExporter();
             fileName = CSV_OUTPUT_FILE;
         } else {
-            exporter = new ExcelDataExporter();
+            exporter = new XlsxSetlistExporter();
             fileName = EXCEL_OUTPUT_FILE;
         }
         exporter.export(generatedSessions, fileName);
