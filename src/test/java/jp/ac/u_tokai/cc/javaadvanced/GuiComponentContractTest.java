@@ -8,6 +8,7 @@ import static org.junit.Assert.assertTrue;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.GraphicsEnvironment;
+import java.awt.Rectangle;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -48,6 +49,7 @@ public class GuiComponentContractTest {
             SetlistEditorFrame frame = new SetlistEditorFrame(projectWithOneEntry(), project -> {
             });
             try {
+                frame.setVisible(true);
                 JTable table = findComponent(frame.getContentPane(), JTable.class);
                 assertNotNull(table);
                 assertEquals(5, table.getColumnCount());
@@ -57,6 +59,9 @@ public class GuiComponentContractTest {
                 assertNotNull(findButton(frame.getContentPane(), "指定順へ"));
                 assertNotNull(findButton(frame.getContentPane(), "別の公演へ"));
                 assertNotNull(findButton(frame.getContentPane(), "再生成"));
+                for (String buttonText : List.of("演目を削除", "再生成", "XLSX保存", "閉じる")) {
+                    assertButtonFullyVisible(frame, buttonText);
+                }
             } finally {
                 frame.dispose();
             }
@@ -74,6 +79,15 @@ public class GuiComponentContractTest {
         JButton button = findComponent(root, JButton.class, candidate -> text.equals(candidate.getText()));
         assertNotNull("ボタンが見つかりません: " + text, button);
         return button;
+    }
+
+    private void assertButtonFullyVisible(SetlistEditorFrame frame, String text) {
+        JButton button = findButton(frame.getContentPane(), text);
+        Rectangle bounds = SwingUtilities.convertRectangle(
+                button.getParent(), button.getBounds(), frame.getContentPane());
+        Rectangle visibleArea = new Rectangle(
+                0, 0, frame.getContentPane().getWidth(), frame.getContentPane().getHeight());
+        assertTrue("ボタンが画面内に収まっていません: " + text, visibleArea.contains(bounds));
     }
 
     private <T extends Component> T findComponent(Container root, Class<T> type) {

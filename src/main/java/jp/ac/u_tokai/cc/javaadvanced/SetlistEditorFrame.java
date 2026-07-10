@@ -2,6 +2,7 @@ package jp.ac.u_tokai.cc.javaadvanced;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.GridLayout;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -64,7 +65,9 @@ public final class SetlistEditorFrame extends JFrame {
     }
 
     private JPanel createActionPanel() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel panel = new JPanel(new GridLayout(2, 1));
+        JPanel sessionAndMovePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel entryAndProjectPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton addSessionButton = new JButton("公演を追加");
         JButton removeSessionButton = new JButton("公演を削除");
         JButton moveUpButton = new JButton("上へ");
@@ -93,19 +96,23 @@ public final class SetlistEditorFrame extends JFrame {
         saveButton.addActionListener(event -> saveProject());
         closeButton.addActionListener(event -> dispose());
 
-        panel.add(addSessionButton);
-        panel.add(removeSessionButton);
-        panel.add(moveUpButton);
-        panel.add(moveDownButton);
-        panel.add(moveFirstButton);
-        panel.add(moveLastButton);
-        panel.add(moveToPositionButton);
-        panel.add(moveToAnotherSessionButton);
-        panel.add(addEntryButton);
-        panel.add(removeEntryButton);
-        panel.add(regenerateButton);
-        panel.add(saveButton);
-        panel.add(closeButton);
+        sessionAndMovePanel.add(addSessionButton);
+        sessionAndMovePanel.add(removeSessionButton);
+        sessionAndMovePanel.add(moveUpButton);
+        sessionAndMovePanel.add(moveDownButton);
+        sessionAndMovePanel.add(moveFirstButton);
+        sessionAndMovePanel.add(moveLastButton);
+        sessionAndMovePanel.add(moveToPositionButton);
+        sessionAndMovePanel.add(moveToAnotherSessionButton);
+
+        entryAndProjectPanel.add(addEntryButton);
+        entryAndProjectPanel.add(removeEntryButton);
+        entryAndProjectPanel.add(regenerateButton);
+        entryAndProjectPanel.add(saveButton);
+        entryAndProjectPanel.add(closeButton);
+
+        panel.add(sessionAndMovePanel);
+        panel.add(entryAndProjectPanel);
         return panel;
     }
 
