@@ -31,6 +31,18 @@ public class SetlistEntryTableModelTest {
     }
 
     @Test
+    public void performerEditDefaultsToTheCurrentSessionOnly() {
+        UUID sourceId = UUID.randomUUID();
+        SetlistEntryTableModel firstSession = new SetlistEntryTableModel(List.of(entry(sourceId)));
+        SetlistEntryTableModel secondSession = new SetlistEntryTableModel(List.of(entry(sourceId)));
+
+        firstSession.setValueAt("代理出演者", 0, 3);
+
+        assertEquals(List.of("代理出演者"), firstSession.entries().get(0).performers());
+        assertEquals(List.of("出演者A"), secondSession.entries().get(0).performers());
+    }
+
+    @Test
     public void invalidDurationDoesNotOverwriteExistingValue() {
         SetlistEntryTableModel model = new SetlistEntryTableModel(List.of(entry(UUID.randomUUID())));
         AtomicReference<String> error = new AtomicReference<>();

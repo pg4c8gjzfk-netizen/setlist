@@ -102,6 +102,19 @@ public class SetlistRegeneratorTest {
         }
     }
 
+    @Test
+    public void regenerateRejectsMultipleOpeningOrClosingEntriesInOneSession() {
+        SetlistProject multipleOpenings = project("1回目", List.of(
+                entry("Opening A", true, FixedPosition.OPENING, -1),
+                entry("Opening B", true, FixedPosition.OPENING, -1)));
+        SetlistProject multipleClosings = project("1回目", List.of(
+                entry("Closing A", true, FixedPosition.CLOSING, -1),
+                entry("Closing B", true, FixedPosition.CLOSING, -1)));
+
+        assertRegenerationFails(multipleOpenings, "オープニング");
+        assertRegenerationFails(multipleClosings, "トリ");
+    }
+
     private SetlistProject project(String name, List<SetlistEntry> entries) {
         return new SetlistProject(List.of(new SetlistSession(name, entries)));
     }
@@ -136,5 +149,14 @@ public class SetlistRegeneratorTest {
                 .sorted()
                 .toList();
         assertEquals(expectedIds, actualIds);
+    }
+
+    private void assertRegenerationFails(SetlistProject project, String expectedMessage) {
+        try {
+            new SetlistRegenerator(new Random(6)).regenerate(project);
+            fail("矛盾する固定条件はエラーになるべきです。");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains(expectedMessage));
+        }
     }
 }
