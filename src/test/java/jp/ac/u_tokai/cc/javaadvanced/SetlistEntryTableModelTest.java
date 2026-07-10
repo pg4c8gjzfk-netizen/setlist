@@ -58,6 +58,22 @@ public class SetlistEntryTableModelTest {
         assertEquals(1, moved.fixedIndex());
     }
 
+    @Test
+    public void checkedFixedEntryRemainsFixedAfterRegeneration() {
+        SetlistEntry first = entry(UUID.randomUUID());
+        SetlistEntry second = entry(UUID.randomUUID());
+        SetlistEntryTableModel model = new SetlistEntryTableModel(List.of(first, second));
+        model.setValueAt(Boolean.TRUE, 1, 4);
+        SetlistProject project = new SetlistProject(List.of(new SetlistSession("第1公演", model.entries())));
+
+        SetlistProject regenerated = new SetlistRegenerator(new java.util.Random(1)).regenerate(project);
+        SetlistEntry fixedEntry = regenerated.sessions().get(0).entries().get(1);
+
+        assertEquals(second.id(), fixedEntry.id());
+        assertTrue(fixedEntry.fixed());
+        assertEquals(FixedPosition.NONE, fixedEntry.fixedPosition());
+    }
+
     private SetlistEntry entry(UUID sourceId) {
         return new SetlistEntry(
                 UUID.randomUUID(), sourceId, "演目", 180,

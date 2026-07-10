@@ -203,6 +203,8 @@ public final class SetlistEditorFrame extends JFrame {
     }
 
     private void regenerate() {
+        // チェックボックスなど、編集中セルの値を確定してから現在のモデルを取得する。
+        stopTableEditing();
         try {
             SetlistProject regenerated = new SetlistRegenerator().regenerate(currentProject());
             setProject(regenerated);
