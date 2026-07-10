@@ -43,19 +43,32 @@ public class SetlistEntryTableModelTest {
     }
 
     @Test
-    public void indexFixedEntryTracksItsNewOrder() {
+    public void fixedCheckboxKeepsFixedEntryWhenItIsMoved() {
         SetlistEntry first = entry(UUID.randomUUID());
         SetlistEntry second = entry(UUID.randomUUID());
         SetlistEntryTableModel model = new SetlistEntryTableModel(List.of(first, second));
 
-        model.setValueAt(FixedPosition.INDEX, 0, 5);
+        model.setValueAt(Boolean.TRUE, 0, 4);
         model.moveEntry(0, 1);
 
         SetlistEntry moved = model.entries().get(1);
         assertEquals(first.id(), moved.id());
         assertTrue(moved.fixed());
-        assertEquals(FixedPosition.INDEX, moved.fixedPosition());
-        assertEquals(1, moved.fixedIndex());
+        assertEquals(FixedPosition.NONE, moved.fixedPosition());
+        assertEquals(-1, moved.fixedIndex());
+    }
+
+    @Test
+    public void editorModelNormalizesLegacyFixedPositionsToCheckboxBasedFixedEntries() {
+        SetlistEntry legacyOpening = new SetlistEntry(
+                UUID.randomUUID(), UUID.randomUUID(), "旧オープニング", 180,
+                List.of("出演者A"), true, FixedPosition.OPENING, -1);
+
+        SetlistEntry normalized = new SetlistEntryTableModel(List.of(legacyOpening)).entries().get(0);
+
+        assertTrue(normalized.fixed());
+        assertEquals(FixedPosition.NONE, normalized.fixedPosition());
+        assertEquals(-1, normalized.fixedIndex());
     }
 
     @Test

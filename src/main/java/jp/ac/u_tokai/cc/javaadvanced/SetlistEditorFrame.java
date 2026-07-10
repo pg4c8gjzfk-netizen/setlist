@@ -10,7 +10,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
@@ -55,7 +54,7 @@ public final class SetlistEditorFrame extends JFrame {
     private void setupWindow() {
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout(8, 8));
-        add(new JLabel("曲名・時間・出演者・固定条件を編集してから「再生成」を押してください。"), BorderLayout.NORTH);
+        add(new JLabel("曲名・時間・出演者を編集し、固定する演目はチェックしてから「再生成」を押してください。"), BorderLayout.NORTH);
         add(sessionTabs, BorderLayout.CENTER);
         add(createActionPanel(), BorderLayout.SOUTH);
         setSize(920, 560);
@@ -68,6 +67,9 @@ public final class SetlistEditorFrame extends JFrame {
         JButton removeSessionButton = new JButton("公演を削除");
         JButton moveUpButton = new JButton("上へ");
         JButton moveDownButton = new JButton("下へ");
+        JButton moveFirstButton = new JButton("先頭へ");
+        JButton moveLastButton = new JButton("末尾へ");
+        JButton moveToPositionButton = new JButton("指定順へ");
         JButton addEntryButton = new JButton("演目を追加");
         JButton removeEntryButton = new JButton("演目を削除");
         JButton regenerateButton = new JButton("再生成");
@@ -78,6 +80,9 @@ public final class SetlistEditorFrame extends JFrame {
         removeSessionButton.addActionListener(event -> removeSelectedSession());
         moveUpButton.addActionListener(event -> moveSelectedEntry(-1));
         moveDownButton.addActionListener(event -> moveSelectedEntry(1));
+        moveFirstButton.addActionListener(event -> moveSelectedEntryTo(0));
+        moveLastButton.addActionListener(event -> moveSelectedEntryToLast());
+        moveToPositionButton.addActionListener(event -> moveSelectedEntryToSpecifiedPosition());
         addEntryButton.addActionListener(event -> addEntry());
         removeEntryButton.addActionListener(event -> removeSelectedEntry());
         regenerateButton.addActionListener(event -> regenerate());
@@ -88,6 +93,9 @@ public final class SetlistEditorFrame extends JFrame {
         panel.add(removeSessionButton);
         panel.add(moveUpButton);
         panel.add(moveDownButton);
+        panel.add(moveFirstButton);
+        panel.add(moveLastButton);
+        panel.add(moveToPositionButton);
         panel.add(addEntryButton);
         panel.add(removeEntryButton);
         panel.add(regenerateButton);
@@ -123,8 +131,6 @@ public final class SetlistEditorFrame extends JFrame {
         JTable table = new JTable(model);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setAutoCreateRowSorter(false);
-        table.getColumnModel().getColumn(5).setCellEditor(new javax.swing.DefaultCellEditor(
-                new JComboBox<>(FixedPosition.values())));
         tableModels.add(model);
         tables.add(table);
         sessionTabs.addTab(name, new JScrollPane(table));
@@ -183,6 +189,51 @@ public final class SetlistEditorFrame extends JFrame {
             model.moveEntry(row, destination);
             if (destination >= 0 && destination < model.getRowCount()) {
                 table.setRowSelectionInterval(destination, destination);
+            }
+        });
+    }
+
+    private void moveSelectedEntryTo(int destination) {
+        selectedModel().ifPresent(model -> {
+            JTable table = selectedTable();
+            int row = table.getSelectedRow();
+            if (row < 0) {
+                showValidationError("移動する演目を選択してください。");
+                return;
+            }
+            model.moveEntry(row, destination);
+            table.setRowSelectionInterval(destination, destination);
+        });
+    }
+
+    private void moveSelectedEntryToLast() {
+        selectedModel().ifPresent(model -> moveSelectedEntryTo(model.getRowCount() - 1));
+    }
+
+    private void moveSelectedEntryToSpecifiedPosition() {
+        selectedModel().ifPresent(model -> {
+            JTable table = selectedTable();
+            int row = table.getSelectedRow();
+            if (row < 0) {
+                showValidationError("移動する演目を選択してください。");
+                return;
+            }
+            String input = JOptionPane.showInputDialog(
+                    this,
+                    "移動先の順番を1から" + model.getRowCount() + "の範囲で入力してください。",
+                    row + 1);
+            if (input == null) {
+                return;
+            }
+            try {
+                int destination = Integer.parseInt(input.trim()) - 1;
+                if (destination < 0 || destination >= model.getRowCount()) {
+                    throw new NumberFormatException();
+                }
+                model.moveEntry(row, destination);
+                table.setRowSelectionInterval(destination, destination);
+            } catch (NumberFormatException exception) {
+                showValidationError("移動先は1から" + model.getRowCount() + "の整数で入力してください。");
             }
         });
     }

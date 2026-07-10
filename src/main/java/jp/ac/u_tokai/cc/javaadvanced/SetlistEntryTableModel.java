@@ -15,7 +15,7 @@ public final class SetlistEntryTableModel extends AbstractTableModel {
 
     private static final long serialVersionUID = 1L;
     private static final String[] COLUMNS = {
-            "順番", "曲名", "時間", "出演者", "固定", "固定位置"
+            "順番", "曲名", "時間", "出演者", "固定"
     };
 
     /** 出演者変更の反映範囲です。 */
@@ -36,7 +36,9 @@ public final class SetlistEntryTableModel extends AbstractTableModel {
     private Runnable changedHandler;
 
     public SetlistEntryTableModel(List<SetlistEntry> entries) {
-        this.entries = new ArrayList<>(Objects.requireNonNull(entries, "entries must not be null"));
+        this.entries = Objects.requireNonNull(entries, "entries must not be null").stream()
+                .map(this::normalizeFixedPosition)
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         this.performerScopeSelector = request -> PerformerChangeScope.CURRENT_SESSION;
         this.allSessionsPerformerUpdater = (sourceId, performers) -> {
         };
@@ -86,7 +88,6 @@ public final class SetlistEntryTableModel extends AbstractTableModel {
         return switch (columnIndex) {
             case 0 -> Integer.class;
             case 4 -> Boolean.class;
-            case 5 -> FixedPosition.class;
             default -> String.class;
         };
     }
@@ -105,7 +106,6 @@ public final class SetlistEntryTableModel extends AbstractTableModel {
             case 2 -> formatDuration(entry.durationSeconds());
             case 3 -> String.join(", ", entry.performers());
             case 4 -> entry.fixed();
-            case 5 -> entry.fixedPosition();
             default -> throw new IllegalArgumentException("Unknown column: " + columnIndex);
         };
     }
@@ -121,7 +121,6 @@ public final class SetlistEntryTableModel extends AbstractTableModel {
                         entry.performers(), entry.fixed(), entry.fixedPosition(), entry.fixedIndex()));
                 case 3 -> updatePerformers(rowIndex, parsePerformers(String.valueOf(value)));
                 case 4 -> updateFixed(rowIndex, Boolean.TRUE.equals(value));
-                case 5 -> updateFixedPosition(rowIndex, (FixedPosition) value);
                 default -> throw new IllegalArgumentException("編集できない列です。");
             }
         } catch (IllegalArgumentException exception) {
@@ -140,7 +139,6 @@ public final class SetlistEntryTableModel extends AbstractTableModel {
 
     public void removeEntry(int rowIndex) {
         entries.remove(rowIndex);
-        normalizeIndexFixedEntries();
         fireTableDataChanged();
         changedHandler.run();
     }
@@ -150,7 +148,6 @@ public final class SetlistEntryTableModel extends AbstractTableModel {
             return;
         }
         Collections.swap(entries, rowIndex, destinationIndex);
-        normalizeIndexFixedEntries();
         fireTableDataChanged();
         changedHandler.run();
     }
@@ -188,18 +185,8 @@ public final class SetlistEntryTableModel extends AbstractTableModel {
 
     private void updateFixed(int rowIndex, boolean fixed) {
         SetlistEntry entry = entries.get(rowIndex);
-        FixedPosition position = fixed ? entry.fixedPosition() : FixedPosition.NONE;
-        int fixedIndex = fixed && position == FixedPosition.INDEX ? rowIndex : -1;
         replace(rowIndex, copy(entry, entry.title(), entry.durationSeconds(), entry.performers(),
-                fixed, position, fixedIndex));
-    }
-
-    private void updateFixedPosition(int rowIndex, FixedPosition position) {
-        SetlistEntry entry = entries.get(rowIndex);
-        FixedPosition normalizedPosition = Objects.requireNonNull(position, "fixedPosition must not be null");
-        int fixedIndex = normalizedPosition == FixedPosition.INDEX ? rowIndex : -1;
-        replace(rowIndex, copy(entry, entry.title(), entry.durationSeconds(), entry.performers(),
-                entry.fixed() || normalizedPosition != FixedPosition.NONE, normalizedPosition, fixedIndex));
+                fixed, FixedPosition.NONE, -1));
     }
 
     private void replace(int rowIndex, SetlistEntry entry) {
@@ -208,14 +195,9 @@ public final class SetlistEntryTableModel extends AbstractTableModel {
         changedHandler.run();
     }
 
-    private void normalizeIndexFixedEntries() {
-        for (int rowIndex = 0; rowIndex < entries.size(); rowIndex++) {
-            SetlistEntry entry = entries.get(rowIndex);
-            if (entry.fixed() && entry.fixedPosition() == FixedPosition.INDEX && entry.fixedIndex() != rowIndex) {
-                entries.set(rowIndex, copy(entry, entry.title(), entry.durationSeconds(), entry.performers(),
-                        true, FixedPosition.INDEX, rowIndex));
-            }
-        }
+    private SetlistEntry normalizeFixedPosition(SetlistEntry entry) {
+        return copy(entry, entry.title(), entry.durationSeconds(), entry.performers(),
+                entry.fixed(), FixedPosition.NONE, -1);
     }
 
     private SetlistEntry copy(
