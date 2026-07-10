@@ -5,8 +5,10 @@ import java.awt.FlowLayout;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import javax.swing.JButton;
@@ -70,6 +72,7 @@ public final class SetlistEditorFrame extends JFrame {
         JButton moveFirstButton = new JButton("先頭へ");
         JButton moveLastButton = new JButton("末尾へ");
         JButton moveToPositionButton = new JButton("指定順へ");
+        JButton moveToAnotherSessionButton = new JButton("別の公演へ");
         JButton addEntryButton = new JButton("演目を追加");
         JButton removeEntryButton = new JButton("演目を削除");
         JButton regenerateButton = new JButton("再生成");
@@ -83,6 +86,7 @@ public final class SetlistEditorFrame extends JFrame {
         moveFirstButton.addActionListener(event -> moveSelectedEntryTo(0));
         moveLastButton.addActionListener(event -> moveSelectedEntryToLast());
         moveToPositionButton.addActionListener(event -> moveSelectedEntryToSpecifiedPosition());
+        moveToAnotherSessionButton.addActionListener(event -> moveSelectedEntryToAnotherSession());
         addEntryButton.addActionListener(event -> addEntry());
         removeEntryButton.addActionListener(event -> removeSelectedEntry());
         regenerateButton.addActionListener(event -> regenerate());
@@ -96,6 +100,7 @@ public final class SetlistEditorFrame extends JFrame {
         panel.add(moveFirstButton);
         panel.add(moveLastButton);
         panel.add(moveToPositionButton);
+        panel.add(moveToAnotherSessionButton);
         panel.add(addEntryButton);
         panel.add(removeEntryButton);
         panel.add(regenerateButton);
@@ -117,7 +122,7 @@ public final class SetlistEditorFrame extends JFrame {
     }
 
     private void addSession() {
-        addSessionTab("第" + (sessionTabs.getTabCount() + 1) + "公演", List.of());
+        addSessionTab(nextSessionName(), List.of());
         sessionTabs.setSelectedIndex(sessionTabs.getTabCount() - 1);
         publishProject();
     }
@@ -238,6 +243,49 @@ public final class SetlistEditorFrame extends JFrame {
         });
     }
 
+    private void moveSelectedEntryToAnotherSession() {
+        int sourceSessionIndex = sessionTabs.getSelectedIndex();
+        if (sourceSessionIndex < 0) {
+            showValidationError("公演タブを選択してください。");
+            return;
+        }
+        JTable sourceTable = selectedTable();
+        int sourceRowIndex = sourceTable.getSelectedRow();
+        if (sourceRowIndex < 0) {
+            showValidationError("移動する演目を選択してください。");
+            return;
+        }
+        List<SessionTarget> targets = new ArrayList<>();
+        for (int sessionIndex = 0; sessionIndex < sessionTabs.getTabCount(); sessionIndex++) {
+            if (sessionIndex != sourceSessionIndex) {
+                targets.add(new SessionTarget(sessionIndex, sessionTabs.getTitleAt(sessionIndex)));
+            }
+        }
+        if (targets.isEmpty()) {
+            showValidationError("移動先の公演がありません。先に「公演を追加」を押してください。");
+            return;
+        }
+        SessionTarget selectedTarget = (SessionTarget) JOptionPane.showInputDialog(
+                this,
+                "移動先の公演を選択してください。",
+                "別の公演へ移動",
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                targets.toArray(),
+                targets.getFirst());
+        if (selectedTarget == null) {
+            return;
+        }
+
+        SetlistEntry movedEntry = tableModels.get(sourceSessionIndex).removeEntryAndReturn(sourceRowIndex);
+        SetlistEntryTableModel targetModel = tableModels.get(selectedTarget.sessionIndex());
+        targetModel.appendEntry(movedEntry);
+        sessionTabs.setSelectedIndex(selectedTarget.sessionIndex());
+        JTable targetTable = tables.get(selectedTarget.sessionIndex());
+        int targetRowIndex = targetModel.getRowCount() - 1;
+        targetTable.setRowSelectionInterval(targetRowIndex, targetRowIndex);
+    }
+
     private void removeSelectedSession() {
         int selectedIndex = sessionTabs.getSelectedIndex();
         if (selectedIndex < 0) {
@@ -317,6 +365,18 @@ public final class SetlistEditorFrame extends JFrame {
         return tables.get(sessionTabs.getSelectedIndex());
     }
 
+    private String nextSessionName() {
+        Set<String> names = new HashSet<>();
+        for (int index = 0; index < sessionTabs.getTabCount(); index++) {
+            names.add(sessionTabs.getTitleAt(index));
+        }
+        int number = 1;
+        while (names.contains("第" + number + "公演")) {
+            number++;
+        }
+        return "第" + number + "公演";
+    }
+
     private void publishProject() {
         if (!rebuilding) {
             projectChangedHandler.accept(currentProject());
@@ -325,5 +385,13 @@ public final class SetlistEditorFrame extends JFrame {
 
     private void showValidationError(String message) {
         JOptionPane.showMessageDialog(this, message, "入力エラー", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private record SessionTarget(int sessionIndex, String sessionName) {
+
+        @Override
+        public String toString() {
+            return sessionName;
+        }
     }
 }

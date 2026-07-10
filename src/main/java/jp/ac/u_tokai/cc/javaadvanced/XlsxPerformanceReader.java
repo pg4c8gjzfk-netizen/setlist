@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,7 +32,7 @@ public class XlsxPerformanceReader implements PerformanceDataReader {
      */
     @Override
     public Map<String, Performance> load(File file) {
-        Map<String, Performance> loadedMap = new HashMap<>();
+        Map<String, Performance> loadedMap = new LinkedHashMap<>();
 
         try (FileInputStream fis = new FileInputStream(file);
                 Workbook workbook = new XSSFWorkbook(fis)) {

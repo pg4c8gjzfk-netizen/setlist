@@ -138,8 +138,30 @@ public final class SetlistEntryTableModel extends AbstractTableModel {
     }
 
     public void removeEntry(int rowIndex) {
-        entries.remove(rowIndex);
+        removeEntryAndReturn(rowIndex);
+    }
+
+    /**
+     * 演目を取り出します。他の公演タブへ移動するときに使用します。
+     *
+     * @param rowIndex 取り出す行番号
+     * @return 取り出した演目
+     */
+    public SetlistEntry removeEntryAndReturn(int rowIndex) {
+        SetlistEntry removedEntry = entries.remove(rowIndex);
         fireTableDataChanged();
+        changedHandler.run();
+        return removedEntry;
+    }
+
+    /**
+     * 他の公演タブから移動した演目を末尾へ追加します。
+     *
+     * @param entry 追加する演目
+     */
+    public void appendEntry(SetlistEntry entry) {
+        entries.add(normalizeFixedPosition(Objects.requireNonNull(entry, "entry must not be null")));
+        fireTableRowsInserted(entries.size() - 1, entries.size() - 1);
         changedHandler.run();
     }
 

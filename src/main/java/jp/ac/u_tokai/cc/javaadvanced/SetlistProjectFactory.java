@@ -34,6 +34,20 @@ public final class SetlistProjectFactory {
         return new SetlistProject(sessions);
     }
 
+    /**
+     * インポートした演目を自動配分せず、未割り当ての1タブとして編集プロジェクトへ変換します。
+     *
+     * @param performances インポート済みの演目
+     * @return 未割り当て演目を持つ編集可能なプロジェクト
+     */
+    public static SetlistProject fromImportedPerformances(Iterable<Performance> performances) {
+        List<SetlistEntry> entries = new ArrayList<>();
+        for (Performance performance : performances) {
+            entries.add(SetlistEntry.fromPerformance(UUID.randomUUID(), performance));
+        }
+        return new SetlistProject(List.of(new SetlistSession("未割り当て", entries)));
+    }
+
     /** GUIで手入力を始めるための空プロジェクトを作成します。 */
     public static SetlistProject newEmptyProject() {
         return new SetlistProject(List.of(new SetlistSession("第1公演", List.of())));

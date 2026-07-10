@@ -87,6 +87,19 @@ public class SetlistEntryTableModelTest {
         assertEquals(FixedPosition.NONE, fixedEntry.fixedPosition());
     }
 
+    @Test
+    public void entryCanMoveBetweenSessionModelsWithoutChangingItsIdentity() {
+        SetlistEntry entry = entry(UUID.randomUUID());
+        SetlistEntryTableModel source = new SetlistEntryTableModel(List.of(entry));
+        SetlistEntryTableModel target = new SetlistEntryTableModel(List.of());
+
+        target.appendEntry(source.removeEntryAndReturn(0));
+
+        assertEquals(0, source.getRowCount());
+        assertEquals(1, target.getRowCount());
+        assertEquals(entry.id(), target.entries().get(0).id());
+    }
+
     private SetlistEntry entry(UUID sourceId) {
         return new SetlistEntry(
                 UUID.randomUUID(), sourceId, "演目", 180,

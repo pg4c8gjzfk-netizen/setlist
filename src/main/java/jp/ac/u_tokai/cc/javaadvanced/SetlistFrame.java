@@ -85,6 +85,7 @@ public class SetlistFrame extends JFrame {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton reloadButton = new JButton("再読込");
         JButton generateButton = new JButton("生成");
+        JButton startEditingButton = new JButton("編集を開始");
         JButton newButton = new JButton("新規作成");
         JButton openProjectButton = new JButton("編集済みXLSXを開く");
         JButton excelButton = new JButton("Excel出力");
@@ -92,6 +93,7 @@ public class SetlistFrame extends JFrame {
 
         reloadButton.addActionListener(event -> loadDataFiles());
         generateButton.addActionListener(event -> generateSetlist());
+        startEditingButton.addActionListener(event -> startEditingSelectedData());
         newButton.addActionListener(event -> openEditor(SetlistProjectFactory.newEmptyProject()));
         openProjectButton.addActionListener(event -> openSavedProject());
         editButton.addActionListener(event -> openEditor(currentProject));
@@ -100,6 +102,7 @@ public class SetlistFrame extends JFrame {
 
         panel.add(reloadButton);
         panel.add(generateButton);
+        panel.add(startEditingButton);
         panel.add(newButton);
         panel.add(openProjectButton);
         panel.add(editButton);
@@ -119,7 +122,7 @@ public class SetlistFrame extends JFrame {
         for (File file : files) {
             dataFileBox.addItem(file);
         }
-        resultArea.setText("データファイルを選択して、生成ボタンを押してください。");
+        resultArea.setText("データファイルを選択して、「生成」または「編集を開始」を押してください。");
     }
 
     private void generateSetlist() {
@@ -150,14 +153,40 @@ public class SetlistFrame extends JFrame {
                 capacities,
                 createRepeatedValues(openerField.getText(), numberOfSessions),
                 createRepeatedValues(closerField.getText(), numberOfSessions));
-        currentProject = SetlistProjectFactory.fromGeneratedSessions(generatedSessions);
-        editButton.setEnabled(!currentProject.sessions().isEmpty());
-        resultArea.setText(formatProject(currentProject));
+        displayGeneratedProject(SetlistProjectFactory.fromGeneratedSessions(generatedSessions));
     }
 
     private Map<String, Performance> loadPerformances(File selectedFile) {
         PerformanceDataReader loader = PerformanceReaderFactory.create(selectedFile);
         return loader.load(selectedFile);
+    }
+
+    private void startEditingSelectedData() {
+        File selectedFile = (File) dataFileBox.getSelectedItem();
+        if (selectedFile == null) {
+            showError("読み込むデータファイルを選択してください。");
+            return;
+        }
+        Map<String, Performance> performances = loadPerformances(selectedFile);
+        if (performances.isEmpty()) {
+            showError("演目データを読み込めませんでした。");
+            return;
+        }
+        generatedSessions = List.of();
+        openEditor(SetlistProjectFactory.fromImportedPerformances(performances.values()));
+    }
+
+    /**
+     * 自動生成済みのプロジェクトを画面へ反映します。
+     *
+     * <p>編集ボタンは、生成結果を表示した後だけ有効になります。</p>
+     *
+     * @param generatedProject 自動生成したプロジェクト
+     */
+    void displayGeneratedProject(SetlistProject generatedProject) {
+        currentProject = generatedProject;
+        editButton.setEnabled(!currentProject.sessions().isEmpty());
+        resultArea.setText(formatProject(currentProject));
     }
 
     private int[] createCapacities(int numberOfSessions) {
