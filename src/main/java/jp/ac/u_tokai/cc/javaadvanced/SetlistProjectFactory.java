@@ -48,6 +48,24 @@ public final class SetlistProjectFactory {
         return new SetlistProject(List.of(new SetlistSession("未割り当て", entries)));
     }
 
+    /**
+     * インポート元のシート名と所属を維持した編集プロジェクトへ変換します。
+     *
+     * @param performanceSheets シート単位の演目
+     * @return 元シートと同じ名前・所属を持つ編集可能なプロジェクト
+     */
+    public static SetlistProject fromImportedSheets(List<PerformanceSheet> performanceSheets) {
+        List<SetlistSession> sessions = new ArrayList<>();
+        for (PerformanceSheet performanceSheet : performanceSheets) {
+            List<SetlistEntry> entries = new ArrayList<>();
+            for (Performance performance : performanceSheet.performances()) {
+                entries.add(SetlistEntry.fromPerformance(UUID.randomUUID(), performance));
+            }
+            sessions.add(new SetlistSession(performanceSheet.name(), entries));
+        }
+        return new SetlistProject(sessions);
+    }
+
     /** GUIで手入力を始めるための空プロジェクトを作成します。 */
     public static SetlistProject newEmptyProject() {
         return new SetlistProject(List.of(new SetlistSession("第1公演", List.of())));

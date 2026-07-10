@@ -5,6 +5,7 @@ import java.awt.FlowLayout;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -49,6 +50,7 @@ public class SetlistFrame extends JFrame {
         this.currentProject = SetlistProjectFactory.newEmptyProject();
 
         setupWindow();
+        dataFileBox.addActionListener(event -> updateGenerationInputMode());
         loadDataFiles();
     }
 
@@ -122,13 +124,18 @@ public class SetlistFrame extends JFrame {
         for (File file : files) {
             dataFileBox.addItem(file);
         }
-        resultArea.setText("データファイルを選択して、「生成」または「編集を開始」を押してください。");
+        updateGenerationInputMode();
     }
 
     private void generateSetlist() {
         File selectedFile = (File) dataFileBox.getSelectedItem();
         if (selectedFile == null) {
             showError("読み込むデータファイルを選択してください。");
+            return;
+        }
+
+        if (isXlsxFile(selectedFile)) {
+            generateSetlistWithinSheets(selectedFile);
             return;
         }
 
@@ -156,9 +163,30 @@ public class SetlistFrame extends JFrame {
         displayGeneratedProject(SetlistProjectFactory.fromGeneratedSessions(generatedSessions));
     }
 
+    /** XLSXの各シートを独立した公演として、シート内の曲順だけを生成します。 */
+    private void generateSetlistWithinSheets(File selectedFile) {
+        List<PerformanceSheet> sourceSheets = loadPerformanceSheets(selectedFile);
+        if (sourceSheets.isEmpty()) {
+            showError("演目データを読み込めませんでした。");
+            return;
+        }
+
+        List<PerformanceSheet> generatedSheets = new SetlistGenerator().generateWithinSheets(
+                sourceSheets, openerField.getText().trim(), closerField.getText().trim());
+        generatedSessions = generatedSheets.stream()
+                .map(PerformanceSheet::performances)
+                .toList();
+        displayGeneratedProject(SetlistProjectFactory.fromImportedSheets(generatedSheets));
+    }
+
     private Map<String, Performance> loadPerformances(File selectedFile) {
         PerformanceDataReader loader = PerformanceReaderFactory.create(selectedFile);
         return loader.load(selectedFile);
+    }
+
+    private List<PerformanceSheet> loadPerformanceSheets(File selectedFile) {
+        PerformanceDataReader loader = PerformanceReaderFactory.create(selectedFile);
+        return loader.loadSheets(selectedFile);
     }
 
     private void startEditingSelectedData() {
@@ -167,13 +195,35 @@ public class SetlistFrame extends JFrame {
             showError("読み込むデータファイルを選択してください。");
             return;
         }
-        Map<String, Performance> performances = loadPerformances(selectedFile);
-        if (performances.isEmpty()) {
+        List<PerformanceSheet> performanceSheets = loadPerformanceSheets(selectedFile);
+        if (performanceSheets.isEmpty()) {
             showError("演目データを読み込めませんでした。");
             return;
         }
         generatedSessions = List.of();
-        openEditor(SetlistProjectFactory.fromImportedPerformances(performances.values()));
+        openEditor(SetlistProjectFactory.fromImportedSheets(performanceSheets));
+    }
+
+    /** XLSXでは元シートが公演数を決めるため、シートをまたぐ配分設定を無効にします。 */
+    private void updateGenerationInputMode() {
+        File selectedFile = (File) dataFileBox.getSelectedItem();
+        boolean sheetScoped = selectedFile != null && isXlsxFile(selectedFile);
+        sessionSpinner.setEnabled(!sheetScoped);
+        capacityField.setEnabled(!sheetScoped);
+
+        if (selectedFile == null) {
+            return;
+        }
+        if (sheetScoped) {
+            resultArea.setText(
+                    "XLSXは各シートを独立した公演として生成します。公演数・上限数によるシート間配分は行いません。");
+        } else {
+            resultArea.setText("データファイルを選択して、「生成」または「編集を開始」を押してください。");
+        }
+    }
+
+    private boolean isXlsxFile(File file) {
+        return file.getName().toLowerCase(Locale.ROOT).endsWith(".xlsx");
     }
 
     /**

@@ -34,38 +34,64 @@ public class XlsxPerformanceReader implements PerformanceDataReader {
     public Map<String, Performance> load(File file) {
         Map<String, Performance> loadedMap = new LinkedHashMap<>();
 
+        for (PerformanceSheet performanceSheet : loadSheets(file)) {
+            for (Performance performance : performanceSheet.performances()) {
+                addFlattenedPerformance(loadedMap, performance, performanceSheet.name());
+            }
+        }
+        return loadedMap;
+    }
+
+    /**
+     * Excelの各シートを独立した演目グループとして読み込みます。
+     *
+     * <p>同じ曲が複数シートに存在しても、別シートの演目として両方を保持します。</p>
+     *
+     * @param file 読み込み対象のExcelファイル
+     * @return 元シート名と演目一覧
+     */
+    @Override
+    public List<PerformanceSheet> loadSheets(File file) {
+        List<PerformanceSheet> performanceSheets = new ArrayList<>();
+
         try (FileInputStream fis = new FileInputStream(file);
                 Workbook workbook = new XSSFWorkbook(fis)) {
             System.out.println("[システム] Excelファイルから " + workbook.getNumberOfSheets() + " 枚のシートを発見しました。");
 
             for (int sheetIndex = 0; sheetIndex < workbook.getNumberOfSheets(); sheetIndex++) {
                 Sheet sheet = workbook.getSheetAt(sheetIndex);
-                loadSheet(sheet, loadedMap);
+                String sheetName = sheet.getSheetName();
+                if (shouldSkipSheet(sheetName)) {
+                    System.out.println("   シート「" + sheetName + "」はスキップします。");
+                    continue;
+                }
+                Map<String, Performance> sheetPerformances = loadSheet(sheet);
+                if (!sheetPerformances.isEmpty()) {
+                    performanceSheets.add(new PerformanceSheet(
+                            sheetName, List.copyOf(sheetPerformances.values())));
+                }
             }
         } catch (Exception e) {
             System.out.println("エラー：.xlsxファイルの読み込みに失敗しました。");
             e.printStackTrace();
         }
 
-        return loadedMap;
+        return List.copyOf(performanceSheets);
     }
 
     /**
      * 1シート分の演目データを読み込みます。
      */
-    private void loadSheet(Sheet sheet, Map<String, Performance> loadedMap) {
+    private Map<String, Performance> loadSheet(Sheet sheet) {
         String sheetName = sheet.getSheetName();
-        if (shouldSkipSheet(sheetName)) {
-            System.out.println("   シート「" + sheetName + "」はスキップします。");
-            return;
-        }
+        Map<String, Performance> loadedMap = new LinkedHashMap<>();
 
         System.out.println("   シート「" + sheetName + "」の読み込みを開始します...");
         DataFormatter formatter = new DataFormatter();
         Row headerRow = sheet.getRow(0);
         if (headerRow == null) {
             System.out.println("[デバッグ] シート「" + sheetName + "」の1行目が存在しないためスキップします。");
-            return;
+            return loadedMap;
         }
 
         Map<Integer, String> performerNameMap = readPerformerNames(headerRow, formatter);
@@ -88,6 +114,7 @@ public class XlsxPerformanceReader implements PerformanceDataReader {
                 System.out.println("[デバッグ] " + (rowIndex + 1) + "行目の「" + title + "」をスキップしました。時間欄: " + durationText);
             }
         }
+        return loadedMap;
     }
 
     /**
@@ -179,6 +206,18 @@ public class XlsxPerformanceReader implements PerformanceDataReader {
         }
 
         Song song = new Song(finalTitle, performance.getPerformers(), performance.getDuration(), 0, "未指定");
+        loadedMap.put(song.getTitle(), song);
+    }
+
+    /** 平坦なMapを必要とする既存処理でも、別シートの演目を欠落させずに追加します。 */
+    private void addFlattenedPerformance(
+            Map<String, Performance> loadedMap, Performance performance, String sheetName) {
+        String finalTitle = performance.getTitle();
+        if (loadedMap.containsKey(finalTitle)) {
+            finalTitle = createUniqueTitle(loadedMap, performance.getTitle(), sheetName);
+        }
+        Song song = new Song(
+                finalTitle, performance.getPerformers(), performance.getDuration(), 0, "未指定");
         loadedMap.put(song.getTitle(), song);
     }
 

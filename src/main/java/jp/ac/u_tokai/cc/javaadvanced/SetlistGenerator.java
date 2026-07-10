@@ -3,8 +3,10 @@ package jp.ac.u_tokai.cc.javaadvanced;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * セットリストを自動生成するクラス。
@@ -38,6 +40,72 @@ public class SetlistGenerator {
 
         System.out.println("セットリストの生成が完了しました！\n");
         return sessions;
+    }
+
+    /**
+     * 入力シートごとに独立して曲順を生成します。
+     *
+     * <p>演目は元シートの外へ移動しません。シート名・シート数・各シートの演目集合を
+     * 生成前後で検証し、境界が壊れた場合は処理を失敗させます。</p>
+     *
+     * @param sourceSheets 元シート単位の演目
+     * @param openerTitle 各シートで先頭候補にする演目名
+     * @param closerTitle 各シートで末尾候補にする演目名
+     * @return シート境界を維持した生成結果
+     */
+    public List<PerformanceSheet> generateWithinSheets(
+            List<PerformanceSheet> sourceSheets, String openerTitle, String closerTitle) {
+        Objects.requireNonNull(sourceSheets, "sourceSheets must not be null");
+
+        List<PerformanceSheet> generatedSheets = new ArrayList<>();
+        for (PerformanceSheet sourceSheet : sourceSheets) {
+            List<Performance> generatedOrder = optimizeOrder(
+                    new ArrayList<>(sourceSheet.performances()), openerTitle, closerTitle);
+            generatedSheets.add(new PerformanceSheet(sourceSheet.name(), generatedOrder));
+        }
+
+        verifySheetMembershipPreserved(sourceSheets, generatedSheets);
+        return List.copyOf(generatedSheets);
+    }
+
+    /** シート数・名前・演目インスタンスが生成前後で一致することを検証します。 */
+    private void verifySheetMembershipPreserved(
+            List<PerformanceSheet> before, List<PerformanceSheet> after) {
+        if (before.size() != after.size()) {
+            throw new IllegalStateException("生成後のシート数が入力と一致しません。");
+        }
+        for (int sheetIndex = 0; sheetIndex < before.size(); sheetIndex++) {
+            PerformanceSheet sourceSheet = before.get(sheetIndex);
+            PerformanceSheet generatedSheet = after.get(sheetIndex);
+            if (!sourceSheet.name().equals(generatedSheet.name())
+                    || !containsSameInstances(
+                            sourceSheet.performances(), generatedSheet.performances())) {
+                throw new IllegalStateException(
+                        "生成後にシート「" + sourceSheet.name() + "」の演目が別シートへ移動しています。");
+            }
+        }
+    }
+
+    private boolean containsSameInstances(List<Performance> before, List<Performance> after) {
+        if (before.size() != after.size()) {
+            return false;
+        }
+        Map<Performance, Integer> remainingCounts = new IdentityHashMap<>();
+        for (Performance performance : before) {
+            remainingCounts.merge(performance, 1, Integer::sum);
+        }
+        for (Performance performance : after) {
+            Integer count = remainingCounts.get(performance);
+            if (count == null) {
+                return false;
+            }
+            if (count == 1) {
+                remainingCounts.remove(performance);
+            } else {
+                remainingCounts.put(performance, count - 1);
+            }
+        }
+        return remainingCounts.isEmpty();
     }
 
     /**
