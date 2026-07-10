@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.UUID;
@@ -27,6 +28,9 @@ public class XlsxSetlistProjectPersistenceTest {
         SetlistProject restored = new XlsxSetlistProjectReader().read(output);
 
         assertEquals(project, restored);
+        assertEquals(project.sessions().stream().mapToInt(session -> session.entries().size()).sum(),
+                new SetlistRegenerator().regenerate(restored).sessions().stream()
+                        .mapToInt(session -> session.entries().size()).sum());
         try (Workbook workbook = new XSSFWorkbook(output)) {
             int metadataIndex = workbook.getSheetIndex(XlsxSetlistProjectWriter.META_SHEET_NAME);
             assertTrue(metadataIndex >= 0);
@@ -45,6 +49,27 @@ public class XlsxSetlistProjectPersistenceTest {
         new XlsxSetlistProjectWriter().write(project, output);
 
         assertEquals(project, new XlsxSetlistProjectReader().read(output));
+    }
+
+    @Test
+    public void readerUsesUserEditedDisplayValuesWhileKeepingMetadata() throws Exception {
+        SetlistProject project = new SetlistProject(List.of(new SetlistSession(
+                "第1公演", List.of(entry("変更前", List.of("出演者A"), false, FixedPosition.NONE, -1)))));
+        File output = Files.createTempFile("edited-setlist-project-", ".xlsx").toFile();
+        File editedOutput = Files.createTempFile("edited-setlist-project-saved-", ".xlsx").toFile();
+        new XlsxSetlistProjectWriter().write(project, output);
+
+        try (Workbook workbook = new XSSFWorkbook(output);
+                FileOutputStream fileOutput = new FileOutputStream(editedOutput)) {
+            workbook.getSheetAt(0).getRow(1).getCell(1).setCellValue("変更後の曲名");
+            workbook.getSheetAt(0).getRow(1).getCell(3).setCellValue("代理出演者, 追加出演者");
+            workbook.write(fileOutput);
+        }
+
+        SetlistEntry restored = new XlsxSetlistProjectReader().read(editedOutput)
+                .sessions().get(0).entries().get(0);
+        assertEquals("変更後の曲名", restored.title());
+        assertEquals(List.of("代理出演者", "追加出演者"), restored.performers());
     }
 
     private SetlistEntry entry(
