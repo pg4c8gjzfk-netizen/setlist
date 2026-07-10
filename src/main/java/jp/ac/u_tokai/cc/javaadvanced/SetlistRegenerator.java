@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 編集済みの香盤表から、固定されていない演目だけを再配置するサービスです。
+ * 編集済みの香盤表から、各公演内で固定されていない演目だけを再配置するサービスです。
  *
  * <p>このクラスは入力プロジェクトを書き換えません。固定条件に矛盾がある場合は
  * {@link IllegalArgumentException} を送出するため、呼び出し側は編集画面の状態を
@@ -49,22 +49,24 @@ public final class SetlistRegenerator {
         Objects.requireNonNull(currentProject, "currentProject must not be null");
         validate(currentProject);
 
-        List<SessionLayout> layouts = new ArrayList<>();
-        List<SetlistEntry> movableEntries = new ArrayList<>();
+        List<SetlistSession> regeneratedSessions = new ArrayList<>();
         for (SetlistSession session : currentProject.sessions()) {
-            layouts.add(createLayout(session, movableEntries));
+            regeneratedSessions.add(regenerateSession(session));
         }
-
-        int freeSlotCount = layouts.stream().mapToInt(SessionLayout::freeSlotCount).sum();
-        if (freeSlotCount != movableEntries.size()) {
-            throw new IllegalArgumentException("未固定演目の数と再配置先の数が一致しません。");
-        }
-
-        List<SetlistEntry> bestOrder = findBestMovableOrder(layouts, movableEntries);
-        List<SetlistSession> regeneratedSessions = placeMovableEntries(layouts, bestOrder);
         SetlistProject regeneratedProject = new SetlistProject(regeneratedSessions);
         verifyEntriesPreserved(currentProject, regeneratedProject);
+        verifySessionMembershipPreserved(currentProject, regeneratedProject);
         return regeneratedProject;
+    }
+
+    private SetlistSession regenerateSession(SetlistSession session) {
+        List<SetlistEntry> movableEntries = new ArrayList<>();
+        SessionLayout layout = createLayout(session, movableEntries);
+        if (layout.freeSlotCount() != movableEntries.size()) {
+            throw new IllegalArgumentException(session.name() + " の未固定演目をすべて配置できません。");
+        }
+        List<SetlistEntry> bestOrder = findBestMovableOrder(List.of(layout), movableEntries);
+        return placeMovableEntries(List.of(layout), bestOrder).getFirst();
     }
 
     /**
@@ -209,11 +211,28 @@ public final class SetlistRegenerator {
         }
     }
 
+    private void verifySessionMembershipPreserved(SetlistProject before, SetlistProject after) {
+        if (before.sessions().size() != after.sessions().size()) {
+            throw new IllegalArgumentException("再生成後の公演数が一致しません。");
+        }
+        for (int sessionIndex = 0; sessionIndex < before.sessions().size(); sessionIndex++) {
+            Set<UUID> beforeIds = entryIdSet(before.sessions().get(sessionIndex));
+            Set<UUID> afterIds = entryIdSet(after.sessions().get(sessionIndex));
+            if (!beforeIds.equals(afterIds)) {
+                throw new IllegalArgumentException("再生成後に公演間で演目が移動しています。");
+            }
+        }
+    }
+
     private List<UUID> entryIds(SetlistProject project) {
         return project.sessions().stream()
                 .flatMap(session -> session.entries().stream())
                 .map(SetlistEntry::id)
                 .toList();
+    }
+
+    private Set<UUID> entryIdSet(SetlistSession session) {
+        return session.entries().stream().map(SetlistEntry::id).collect(java.util.stream.Collectors.toSet());
     }
 
     private boolean sharesPerformer(SetlistEntry first, SetlistEntry second) {

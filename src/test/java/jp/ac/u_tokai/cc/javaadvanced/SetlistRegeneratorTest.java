@@ -53,6 +53,22 @@ public class SetlistRegeneratorTest {
     }
 
     @Test
+    public void regenerateKeepsEveryEntryInItsOriginalSession() {
+        SetlistEntry firstSessionFirst = entry("第1公演A", false, FixedPosition.NONE, -1);
+        SetlistEntry firstSessionSecond = entry("第1公演B", false, FixedPosition.NONE, -1);
+        SetlistEntry secondSessionFirst = entry("第2公演A", false, FixedPosition.NONE, -1);
+        SetlistEntry secondSessionSecond = entry("第2公演B", false, FixedPosition.NONE, -1);
+        SetlistProject project = new SetlistProject(List.of(
+                new SetlistSession("第1公演", List.of(firstSessionFirst, firstSessionSecond)),
+                new SetlistSession("第2公演", List.of(secondSessionFirst, secondSessionSecond))));
+
+        SetlistProject regenerated = new SetlistRegenerator(new Random(5)).regenerate(project);
+
+        assertSessionContainsExactly(regenerated.sessions().get(0), firstSessionFirst, firstSessionSecond);
+        assertSessionContainsExactly(regenerated.sessions().get(1), secondSessionFirst, secondSessionSecond);
+    }
+
+    @Test
     public void regenerateRejectsConflictingFixedPositionsWithoutChangingProject() {
         SetlistEntry opening = entry("Opening", true, FixedPosition.OPENING, -1);
         SetlistEntry firstIndex = entry("First index", true, FixedPosition.INDEX, 0);
@@ -104,6 +120,18 @@ public class SetlistRegeneratorTest {
                 .toList();
         List<UUID> actualIds = actual.sessions().stream()
                 .flatMap(session -> session.entries().stream())
+                .map(SetlistEntry::id)
+                .sorted()
+                .toList();
+        assertEquals(expectedIds, actualIds);
+    }
+
+    private void assertSessionContainsExactly(SetlistSession session, SetlistEntry... expectedEntries) {
+        List<UUID> expectedIds = java.util.Arrays.stream(expectedEntries)
+                .map(SetlistEntry::id)
+                .sorted()
+                .toList();
+        List<UUID> actualIds = session.entries().stream()
                 .map(SetlistEntry::id)
                 .sorted()
                 .toList();
