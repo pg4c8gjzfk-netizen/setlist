@@ -13,6 +13,7 @@ import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -43,8 +44,8 @@ public class SetlistFrame extends JFrame {
     private final JButton newButton;
     private final JButton openProjectButton;
     private final JButton excelButton;
-    private List<PerformanceSheet> generatedSheets;
     private SetlistProject currentProject;
+    private boolean projectAvailable;
 
     /** メイン画面を作成します。 */
     public SetlistFrame() {
@@ -57,9 +58,9 @@ public class SetlistFrame extends JFrame {
         this.startEditingButton = AppTheme.primaryButton("編集を開始");
         this.newButton = AppTheme.quietButton("新規作成");
         this.openProjectButton = AppTheme.quietButton("編集済みXLSXを開く");
-        this.excelButton = AppTheme.quietButton("XLSX出力");
-        this.generatedSheets = List.of();
+        this.excelButton = AppTheme.quietButton("配布用XLSX出力");
         this.currentProject = SetlistProjectFactory.newEmptyProject();
+        this.projectAvailable = false;
 
         setupWindow();
         dataFileBox.addActionListener(event -> updateSelectedFileHint());
@@ -90,6 +91,7 @@ public class SetlistFrame extends JFrame {
         resultArea.setText("まだプレビューはありません。\nデータを選び、「編集を開始」または「生成」を選択してください。");
         AppTheme.stylePreview(resultArea);
         editButton.setEnabled(false);
+        excelButton.setEnabled(false);
 
         root.add(createHeaderPanel(), BorderLayout.NORTH);
 
@@ -192,12 +194,13 @@ public class SetlistFrame extends JFrame {
         newButton.addActionListener(event -> openEditor(SetlistProjectFactory.newEmptyProject()));
         openProjectButton.addActionListener(event -> openSavedProject());
         editButton.addActionListener(event -> openEditor(currentProject));
-        excelButton.addActionListener(event -> exportGeneratedSetlist());
+        excelButton.addActionListener(event -> exportCurrentProject());
 
         newButton.setToolTipText("空の香盤表から作成します（Ctrl/Command+N）");
         openProjectButton.setToolTipText("編集状態を保持したXLSXを開きます（Ctrl/Command+O）");
         generateButton.setToolTipText("入力データから曲順を自動生成します（Ctrl/Command+G）");
         startEditingButton.setToolTipText("入力データをそのまま公演タブで開きます");
+        excelButton.setToolTipText("現在のプレビュー内容を配布用XLSXとして保存します");
 
         JPanel leftActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         leftActions.setOpaque(false);
@@ -274,7 +277,7 @@ public class SetlistFrame extends JFrame {
             return;
         }
 
-        generatedSheets = new SetlistGenerator().generateWithinSheets(sourceSheets);
+        List<PerformanceSheet> generatedSheets = new SetlistGenerator().generateWithinSheets(sourceSheets);
         displayGeneratedProject(SetlistProjectFactory.fromImportedSheets(generatedSheets));
     }
 
@@ -293,7 +296,6 @@ public class SetlistFrame extends JFrame {
             showError("演目データを読み込めませんでした。");
             return;
         }
-        generatedSheets = List.of();
         openEditor(SetlistProjectFactory.fromImportedSheets(performanceSheets));
     }
 
@@ -316,19 +318,21 @@ public class SetlistFrame extends JFrame {
      * @param generatedProject 自動生成したプロジェクト
      */
     void displayGeneratedProject(SetlistProject generatedProject) {
-        currentProject = generatedProject;
-        editButton.setEnabled(!currentProject.sessions().isEmpty());
-        resultArea.setText(formatProject(currentProject));
+        updateCurrentProject(generatedProject);
     }
 
     private void openEditor(SetlistProject project) {
-        currentProject = project;
-        editButton.setEnabled(true);
-        SetlistEditorFrame editor = new SetlistEditorFrame(project, updatedProject -> {
-            currentProject = updatedProject;
-            resultArea.setText(formatProject(updatedProject));
-        });
+        updateCurrentProject(project);
+        SetlistEditorFrame editor = new SetlistEditorFrame(project, this::updateCurrentProject);
         editor.setVisible(true);
+    }
+
+    private void updateCurrentProject(SetlistProject project) {
+        currentProject = Objects.requireNonNull(project, "project must not be null");
+        projectAvailable = !currentProject.sessions().isEmpty();
+        editButton.setEnabled(projectAvailable);
+        excelButton.setEnabled(projectAvailable);
+        resultArea.setText(formatProject(currentProject));
     }
 
     private void openSavedProject() {
@@ -346,17 +350,47 @@ public class SetlistFrame extends JFrame {
         }
     }
 
-    private void exportGeneratedSetlist() {
-        if (generatedSheets.isEmpty()) {
-            showError("先にセットリストを生成してください。");
+    private void exportCurrentProject() {
+        if (!projectAvailable) {
+            showError("先に香盤表を作成または読み込んでください。");
+            return;
+        }
+
+        JFileChooser chooser = new JFileChooser(new File("Data/output"));
+        chooser.setDialogTitle("現在の香盤表を配布用XLSXとして保存");
+        chooser.setFileFilter(new FileNameExtensionFilter("Excelファイル (*.xlsx)", "xlsx"));
+        chooser.setSelectedFile(new File("Data/output", "output_setlist.xlsx"));
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        File outputFile = ensureXlsxExtension(chooser.getSelectedFile());
+        if (outputFile.exists() && JOptionPane.showConfirmDialog(
+                this,
+                outputFile.getName() + " を上書きしますか？",
+                "上書き確認",
+                JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
             return;
         }
         try {
-            File outputFile = new XlsxSetlistExporter().export(generatedSheets, "output_setlist.xlsx");
-            JOptionPane.showMessageDialog(this, "XLSXを保存しました: " + outputFile.getAbsolutePath());
+            File savedFile = writeCurrentProject(outputFile);
+            JOptionPane.showMessageDialog(this, "配布用XLSXを保存しました: " + savedFile.getAbsolutePath());
         } catch (IOException | IllegalArgumentException exception) {
             showError("XLSXの出力に失敗しました: " + exception.getMessage());
         }
+    }
+
+    /** 現在の編集内容を指定先へ書き出します。回帰テストからも使用します。 */
+    File writeCurrentProject(File outputFile) throws IOException {
+        if (!projectAvailable) {
+            throw new IllegalStateException("出力できる香盤表がありません。");
+        }
+        return new XlsxSetlistExporter().export(currentProject, outputFile);
+    }
+
+    private File ensureXlsxExtension(File file) {
+        return file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".xlsx")
+                ? file
+                : new File(file.getParentFile(), file.getName() + ".xlsx");
     }
 
     private String formatProject(SetlistProject project) {

@@ -5,6 +5,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.util.List;
+import java.util.UUID;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.Rule;
@@ -36,5 +37,33 @@ public class XlsxSetlistExporterTest {
             assertEquals("第1公演の曲", workbook.getSheetAt(0).getRow(1).getCell(1).getStringCellValue());
             assertEquals("第2公演の曲", workbook.getSheetAt(1).getRow(1).getCell(1).getStringCellValue());
         }
+    }
+
+    @Test
+    public void exportProjectUsesLatestEditedValuesAndKeepsSessionsSeparated() throws Exception {
+        SetlistEntry editedFirst = entry("編集後の第1公演曲", List.of("代理出演者"));
+        SetlistEntry editedSecond = entry("編集後の第2公演曲", List.of("出演者B", "出演者C"));
+        SetlistProject currentProject = new SetlistProject(List.of(
+                new SetlistSession("0427M", List.of(editedFirst), List.of("代理出演者")),
+                new SetlistSession("0513W", List.of(editedSecond), List.of("出演者B", "出演者C"))), true);
+        File output = new File(temporaryFolder.newFolder("current-project-output"), "setlist.xlsx");
+
+        new XlsxSetlistExporter().export(currentProject, output);
+
+        try (Workbook workbook = new XSSFWorkbook(output)) {
+            assertEquals(2, workbook.getNumberOfSheets());
+            assertEquals("0427M", workbook.getSheetAt(0).getSheetName());
+            assertEquals("0513W", workbook.getSheetAt(1).getSheetName());
+            assertEquals("編集後の第1公演曲", workbook.getSheetAt(0).getRow(1).getCell(1).getStringCellValue());
+            assertEquals("代理出演者", workbook.getSheetAt(0).getRow(1).getCell(3).getStringCellValue());
+            assertEquals("編集後の第2公演曲", workbook.getSheetAt(1).getRow(1).getCell(1).getStringCellValue());
+            assertEquals("出演者B, 出演者C", workbook.getSheetAt(1).getRow(1).getCell(3).getStringCellValue());
+        }
+    }
+
+    private SetlistEntry entry(String title, List<String> performers) {
+        return new SetlistEntry(
+                UUID.randomUUID(), UUID.randomUUID(), title, 180,
+                performers, false, FixedPosition.NONE, -1);
     }
 }

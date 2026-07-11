@@ -12,6 +12,8 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
+import java.io.File;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -23,6 +25,8 @@ import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -44,14 +48,16 @@ public class GuiComponentContractTest {
                 assertEquals("Setlist Studio", frame.getTitle());
                 JButton editButton = findButton(frame.getContentPane(), "編集");
                 JButton startEditingButton = findButton(frame.getContentPane(), "編集を開始");
+                JButton exportButton = findButton(frame.getContentPane(), "配布用XLSX出力");
                 assertNotNull(editButton);
                 assertNotNull(startEditingButton);
-                assertNotNull(findButton(frame.getContentPane(), "XLSX出力"));
+                assertNotNull(exportButton);
                 assertNotNull(findComponent(
                         frame.getContentPane(), JLabel.class,
                         candidate -> "XLSXファイル".equals(candidate.getText())));
                 assertNull(findComponent(frame.getContentPane(), JTextField.class));
                 assertFalse(editButton.isEnabled());
+                assertFalse(exportButton.isEnabled());
                 assertNotNull(startEditingButton.getClientProperty(
                         com.formdev.flatlaf.FlatClientProperties.STYLE));
                 assertShortcut(frame, KeyEvent.VK_N, "new-project");
@@ -60,6 +66,30 @@ public class GuiComponentContractTest {
                 frame.displayGeneratedProject(projectWithOneEntry());
 
                 assertTrue(editButton.isEnabled());
+                assertTrue(exportButton.isEnabled());
+            } finally {
+                frame.dispose();
+            }
+        });
+    }
+
+    @Test
+    public void mainFrameExportsTheMostRecentlyDisplayedProject() throws Exception {
+        Assume.assumeFalse("画面表示できない環境ではSwing契約テストを実行しません。", GraphicsEnvironment.isHeadless());
+        runOnEventDispatchThread(() -> {
+            SetlistFrame frame = new SetlistFrame();
+            File output = Files.createTempFile("latest-setlist-project-", ".xlsx").toFile();
+            output.deleteOnExit();
+            try {
+                frame.displayGeneratedProject(projectWithEntry("生成直後の演目", List.of("出演者A")));
+                frame.displayGeneratedProject(projectWithEntry("編集後の演目", List.of("代理出演者")));
+
+                frame.writeCurrentProject(output);
+
+                try (Workbook workbook = new XSSFWorkbook(output)) {
+                    assertEquals("編集後の演目", workbook.getSheetAt(0).getRow(1).getCell(1).getStringCellValue());
+                    assertEquals("代理出演者", workbook.getSheetAt(0).getRow(1).getCell(3).getStringCellValue());
+                }
             } finally {
                 frame.dispose();
             }
@@ -139,9 +169,13 @@ public class GuiComponentContractTest {
     }
 
     private SetlistProject projectWithOneEntry() {
+        return projectWithEntry("確認用演目", List.of("出演者A"));
+    }
+
+    private SetlistProject projectWithEntry(String title, List<String> performers) {
         SetlistEntry entry = new SetlistEntry(
-                UUID.randomUUID(), UUID.randomUUID(), "確認用演目", 180,
-                List.of("出演者A"), false, FixedPosition.NONE, -1);
+                UUID.randomUUID(), UUID.randomUUID(), title, 180,
+                performers, false, FixedPosition.NONE, -1);
         return new SetlistProject(List.of(new SetlistSession(
                 "第1公演", List.of(entry), List.of("出演者A", "出演者B"))));
     }
