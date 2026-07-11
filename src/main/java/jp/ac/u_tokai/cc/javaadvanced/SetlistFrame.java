@@ -17,9 +17,7 @@ import java.util.Objects;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JFileChooser;
@@ -28,14 +26,14 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 /** 自動生成、編集画面への遷移、既存形式での出力を行うメイン画面です。 */
 public class SetlistFrame extends JFrame {
     private static final long serialVersionUID = 1L;
-    private static final String DATA_DIRECTORY = "Data";
 
-    private final JComboBox<File> dataFileBox;
+    private final JTextField inputFileField;
     private final JTextArea resultArea;
     private final JLabel sheetHintLabel;
     private final JButton editButton;
@@ -47,6 +45,8 @@ public class SetlistFrame extends JFrame {
     private final JButton excelButton;
     private final JLabel projectStatusLabel;
     private final UnsavedChangesPrompt unsavedChangesPrompt;
+    private final AppFileLocations fileLocations;
+    private File selectedInputFile;
     private SetlistProject currentProject;
     private boolean projectAvailable;
     private boolean unsavedChanges;
@@ -55,16 +55,21 @@ public class SetlistFrame extends JFrame {
 
     /** メイン画面を作成します。 */
     public SetlistFrame() {
-        this(UnsavedChangesPrompt.swingDialog());
+        this(UnsavedChangesPrompt.swingDialog(), new AppFileLocations());
     }
 
     SetlistFrame(UnsavedChangesPrompt unsavedChangesPrompt) {
+        this(unsavedChangesPrompt, new AppFileLocations());
+    }
+
+    SetlistFrame(UnsavedChangesPrompt unsavedChangesPrompt, AppFileLocations fileLocations) {
         super("Setlist Studio");
         this.unsavedChangesPrompt = Objects.requireNonNull(
                 unsavedChangesPrompt, "unsavedChangesPrompt must not be null");
-        this.dataFileBox = new JComboBox<>();
+        this.fileLocations = Objects.requireNonNull(fileLocations, "fileLocations must not be null");
+        this.inputFileField = new JTextField("XLSXファイルが選択されていません");
         this.resultArea = new JTextArea(22, 70);
-        this.sheetHintLabel = AppTheme.body("XLSXファイルを選択してください。");
+        this.sheetHintLabel = AppTheme.body("任意の場所にあるXLSXファイルを選択してください。");
         this.editButton = AppTheme.secondaryButton("編集");
         this.generateButton = AppTheme.secondaryButton("生成");
         this.startEditingButton = AppTheme.primaryButton("編集を開始");
@@ -78,8 +83,6 @@ public class SetlistFrame extends JFrame {
         this.unsavedChanges = false;
 
         setupWindow();
-        dataFileBox.addActionListener(event -> updateSelectedFileHint());
-        loadDataFiles();
     }
 
     private void setupWindow() {
@@ -90,15 +93,9 @@ public class SetlistFrame extends JFrame {
         root.setFocusable(true);
         setContentPane(root);
 
-        DefaultListCellRenderer fileRenderer = new DefaultListCellRenderer();
-        dataFileBox.setRenderer((list, value, index, isSelected, cellHasFocus) -> {
-            Component rendered = fileRenderer.getListCellRendererComponent(
-                    list, value, index, isSelected, cellHasFocus);
-            if (rendered instanceof JLabel label) {
-                label.setText(value == null ? "" : value.getName());
-            }
-            return rendered;
-        });
+        inputFileField.setEditable(false);
+        inputFileField.setToolTipText("「XLSXを選択」から入力ファイルを指定してください。");
+        inputFileField.getAccessibleContext().setAccessibleName("選択中の入力XLSXファイル");
 
         resultArea.setEditable(false);
         resultArea.setLineWrap(true);
@@ -106,6 +103,8 @@ public class SetlistFrame extends JFrame {
         resultArea.setText("まだプレビューはありません。\nデータを選び、「編集を開始」または「生成」を選択してください。");
         AppTheme.stylePreview(resultArea);
         editButton.setEnabled(false);
+        generateButton.setEnabled(false);
+        startEditingButton.setEnabled(false);
         saveProjectButton.setEnabled(false);
         excelButton.setEnabled(false);
 
@@ -169,15 +168,15 @@ public class SetlistFrame extends JFrame {
 
         constraints.gridx = 0;
         constraints.weightx = 1.0;
-        fields.add(createFieldGroup("XLSXファイル", dataFileBox, 500), constraints);
+        fields.add(createFieldGroup("入力XLSX", inputFileField, 500), constraints);
 
-        JButton reloadButton = AppTheme.quietButton("再読込");
-        reloadButton.setToolTipText("Dataフォルダの入力ファイル一覧を更新します");
-        reloadButton.addActionListener(event -> loadDataFiles());
+        JButton chooseInputButton = AppTheme.quietButton("XLSXを選択");
+        chooseInputButton.setToolTipText("任意の場所にある入力XLSXファイルを選択します");
+        chooseInputButton.addActionListener(event -> chooseInputFile());
         constraints.gridx = 1;
         constraints.weightx = 0;
         constraints.anchor = GridBagConstraints.SOUTHWEST;
-        fields.add(reloadButton, constraints);
+        fields.add(chooseInputButton, constraints);
 
         panel.add(fields, BorderLayout.CENTER);
 
@@ -271,26 +270,40 @@ public class SetlistFrame extends JFrame {
         return panel;
     }
 
-    private void loadDataFiles() {
-        dataFileBox.removeAllItems();
-        File dataDir = new File(DATA_DIRECTORY);
-        File[] files = dataDir.listFiles((directory, name) ->
-                name.toLowerCase(java.util.Locale.ROOT).endsWith(".xlsx"));
-        if (files == null || files.length == 0) {
-            sheetHintLabel.setText("DataフォルダにXLSXファイルがありません。");
-            resultArea.setText("入力データが見つかりません。\nDataフォルダへXLSXを追加し、「再読込」を押してください。");
+    private void chooseInputFile() {
+        JFileChooser chooser = new JFileChooser(fileLocations.inputDirectory());
+        chooser.setDialogTitle("入力XLSXを選択");
+        chooser.setFileFilter(new FileNameExtensionFilter("Excelファイル (*.xlsx)", "xlsx"));
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
             return;
         }
-        for (File file : files) {
-            dataFileBox.addItem(file);
+        try {
+            setSelectedInputFile(chooser.getSelectedFile());
+        } catch (IllegalArgumentException exception) {
+            showError(exception.getMessage());
         }
-        updateSelectedFileHint();
+    }
+
+    /** 入力XLSXを選択し、生成・編集操作を有効化します。 */
+    void setSelectedInputFile(File inputFile) {
+        if (inputFile == null
+                || !inputFile.isFile()
+                || !inputFile.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".xlsx")) {
+            throw new IllegalArgumentException("読み込むXLSXファイルを選択してください。");
+        }
+        selectedInputFile = inputFile.getAbsoluteFile();
+        fileLocations.rememberInputFile(selectedInputFile);
+        inputFileField.setText(selectedInputFile.getName());
+        inputFileField.setToolTipText(selectedInputFile.getAbsolutePath());
+        generateButton.setEnabled(true);
+        startEditingButton.setEnabled(true);
+        sheetHintLabel.setText("● 選択済み。各シートを独立した公演として保持し、シート間の再配分は行いません。");
     }
 
     private void generateSetlist() {
-        File selectedFile = (File) dataFileBox.getSelectedItem();
+        File selectedFile = selectedInputFile;
         if (selectedFile == null) {
-            showError("読み込むデータファイルを選択してください。");
+            showError("読み込むXLSXファイルを選択してください。");
             return;
         }
 
@@ -320,9 +333,9 @@ public class SetlistFrame extends JFrame {
     }
 
     private void startEditingSelectedData() {
-        File selectedFile = (File) dataFileBox.getSelectedItem();
+        File selectedFile = selectedInputFile;
         if (selectedFile == null) {
-            showError("読み込むデータファイルを選択してください。");
+            showError("読み込むXLSXファイルを選択してください。");
             return;
         }
         List<PerformanceSheet> performanceSheets;
@@ -342,17 +355,6 @@ public class SetlistFrame extends JFrame {
         closeActiveEditor();
         replaceCurrentProject(SetlistProjectFactory.fromImportedSheets(performanceSheets), false, null);
         openCurrentProjectEditor();
-    }
-
-    /** 選択中のXLSXとシート境界の扱いを案内します。 */
-    private void updateSelectedFileHint() {
-        File selectedFile = (File) dataFileBox.getSelectedItem();
-        dataFileBox.setToolTipText(selectedFile == null ? null : selectedFile.getAbsolutePath());
-
-        if (selectedFile == null) {
-            return;
-        }
-        sheetHintLabel.setText("● 各シートを独立した公演として保持し、シート間の再配分は行いません。");
     }
 
     /**
@@ -385,7 +387,8 @@ public class SetlistFrame extends JFrame {
                 currentProject,
                 this::handleProjectChanged,
                 this::handleProjectSaved,
-                unsavedChanges);
+                unsavedChanges,
+                fileLocations);
         activeEditor = editor;
         editor.addWindowListener(new WindowAdapter() {
             @Override
@@ -403,6 +406,7 @@ public class SetlistFrame extends JFrame {
     }
 
     private void handleProjectSaved(SetlistProject project, File outputFile) {
+        fileLocations.rememberOutputFile(outputFile);
         replaceCurrentProject(project, false, outputFile);
     }
 
@@ -419,7 +423,7 @@ public class SetlistFrame extends JFrame {
     }
 
     private void openSavedProject() {
-        JFileChooser chooser = new JFileChooser(new File("Data/output"));
+        JFileChooser chooser = new JFileChooser(fileLocations.outputDirectory());
         chooser.setDialogTitle("編集可能な香盤表XLSXを開く");
         chooser.setFileFilter(new FileNameExtensionFilter("Excelファイル (*.xlsx)", "xlsx"));
         if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
@@ -431,6 +435,7 @@ public class SetlistFrame extends JFrame {
             if (!confirmProjectReplacement("編集済みXLSXを開く")) {
                 return;
             }
+            fileLocations.rememberOutputFile(inputFile);
             closeActiveEditor();
             replaceCurrentProject(loadedProject, false, inputFile);
             openCurrentProjectEditor();
@@ -447,10 +452,10 @@ public class SetlistFrame extends JFrame {
         synchronizeActiveEditor();
         File outputFile = editableProjectFile;
         if (outputFile == null) {
-            JFileChooser chooser = new JFileChooser(new File("Data/output"));
+            JFileChooser chooser = new JFileChooser(fileLocations.outputDirectory());
             chooser.setDialogTitle("編集状態を保存");
             chooser.setFileFilter(new FileNameExtensionFilter("Excelファイル (*.xlsx)", "xlsx"));
-            chooser.setSelectedFile(new File("Data/output", "setlist-project.xlsx"));
+            chooser.setSelectedFile(fileLocations.defaultOutputFile("setlist-project.xlsx"));
             if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
                 return false;
             }
@@ -485,6 +490,7 @@ public class SetlistFrame extends JFrame {
             return activeEditor.writeEditableProject(absoluteFile);
         }
         new XlsxSetlistProjectWriter().write(currentProject, absoluteFile);
+        fileLocations.rememberOutputFile(absoluteFile);
         replaceCurrentProject(currentProject, false, absoluteFile);
         return absoluteFile;
     }
@@ -559,10 +565,10 @@ public class SetlistFrame extends JFrame {
             return;
         }
 
-        JFileChooser chooser = new JFileChooser(new File("Data/output"));
+        JFileChooser chooser = new JFileChooser(fileLocations.outputDirectory());
         chooser.setDialogTitle("現在の香盤表を配布用XLSXとして保存");
         chooser.setFileFilter(new FileNameExtensionFilter("Excelファイル (*.xlsx)", "xlsx"));
-        chooser.setSelectedFile(new File("Data/output", "output_setlist.xlsx"));
+        chooser.setSelectedFile(fileLocations.defaultOutputFile("output_setlist.xlsx"));
         if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
             return;
         }
@@ -576,6 +582,7 @@ public class SetlistFrame extends JFrame {
         }
         try {
             File savedFile = writeCurrentProject(outputFile);
+            fileLocations.rememberOutputFile(savedFile);
             JOptionPane.showMessageDialog(this, "配布用XLSXを保存しました: " + savedFile.getAbsolutePath());
         } catch (IOException | IllegalArgumentException exception) {
             showError("XLSXの出力に失敗しました: " + exception.getMessage());

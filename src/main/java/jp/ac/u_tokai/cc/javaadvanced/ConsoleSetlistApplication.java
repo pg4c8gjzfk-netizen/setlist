@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,18 +13,19 @@ import java.util.Scanner;
 /** XLSXの読込・シート単位生成・XLSX出力を行うコンソール版です。 */
 public class ConsoleSetlistApplication {
 
-    private static final String DATA_DIRECTORY = "Data";
     private static final String OUTPUT_FILE = "output_setlist.xlsx";
 
     private final Scanner scanner;
     private final PerformanceSearcher searcher;
     private final SetlistGenerator generator;
+    private final AppFileLocations fileLocations;
 
     /** 標準入力を使うコンソールアプリとして初期化します。 */
     public ConsoleSetlistApplication() {
         this.scanner = new Scanner(System.in);
         this.searcher = new PerformanceSearcher();
         this.generator = new SetlistGenerator();
+        this.fileLocations = new AppFileLocations();
     }
 
     /** アプリケーション全体の流れを実行します。 */
@@ -69,25 +69,25 @@ public class ConsoleSetlistApplication {
         }
     }
 
-    /** Dataフォルダ内から読み込むXLSXを選択します。 */
+    /** 任意の場所にあるXLSXをパス指定で選択します。 */
     private File chooseDataFile() {
-        File dataDirectory = new File(DATA_DIRECTORY);
-        File[] targetFiles = dataDirectory.listFiles((directory, name) ->
-                name.toLowerCase(java.util.Locale.ROOT).endsWith(".xlsx"));
-
-        if (targetFiles == null || targetFiles.length == 0) {
-            System.out.println("Dataフォルダ内にXLSXファイルが見つかりません。プログラムを終了します。");
+        System.out.println(">>> 読み込むXLSXファイルを指定してください。");
+        System.out.print("ファイルの絶対パス（空欄で終了）：");
+        String input = scanner.nextLine().trim();
+        if (input.isEmpty()) {
+            System.out.println("ファイルが指定されなかったため、プログラムを終了します。");
             return null;
         }
-
-        Arrays.sort(targetFiles, java.util.Comparator.comparing(File::getName));
-        System.out.println(">>> 読み込むXLSXファイルを選択してください。");
-        for (int index = 0; index < targetFiles.length; index++) {
-            System.out.println((index + 1) + ": " + targetFiles[index].getName());
+        if (input.length() >= 2 && input.startsWith("\"") && input.endsWith("\"")) {
+            input = input.substring(1, input.length() - 1);
         }
-
-        int choice = readMenuChoice("番号を入力：", 1, targetFiles.length);
-        File selectedFile = targetFiles[choice - 1];
+        File selectedFile = new File(input).getAbsoluteFile();
+        if (!selectedFile.isFile()
+                || !selectedFile.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".xlsx")) {
+            System.out.println("指定されたXLSXファイルが見つかりません: " + selectedFile.getAbsolutePath());
+            return null;
+        }
+        fileLocations.rememberInputFile(selectedFile);
         System.out.println("\n>>> 「" + selectedFile.getName() + "」を読み込みます...");
         return selectedFile;
     }
@@ -183,7 +183,8 @@ public class ConsoleSetlistApplication {
     /** 生成結果をXLSXへ保存します。 */
     private void exportSheets(List<PerformanceSheet> generatedSheets) {
         try {
-            File outputFile = new XlsxSetlistExporter().export(generatedSheets, OUTPUT_FILE);
+            File outputFile = new XlsxSetlistExporter(fileLocations.outputDirectory().toPath())
+                    .export(generatedSheets, OUTPUT_FILE);
             System.out.println("\n>>> 保存先: " + outputFile.getAbsolutePath());
         } catch (IOException | IllegalArgumentException exception) {
             throw new IllegalStateException("XLSXの保存に失敗しました。", exception);
@@ -199,19 +200,4 @@ public class ConsoleSetlistApplication {
         System.out.println("\n実行に成功しました");
     }
 
-    /** 指定範囲内のメニュー番号を読み取ります。 */
-    private int readMenuChoice(String prompt, int min, int max) {
-        while (true) {
-            System.out.print(prompt);
-            try {
-                int value = Integer.parseInt(scanner.nextLine());
-                if (value >= min && value <= max) {
-                    return value;
-                }
-            } catch (NumberFormatException exception) {
-                // ループして再入力を促す
-            }
-            System.out.println(min + "から" + max + "までの番号を入力してください。");
-        }
-    }
 }

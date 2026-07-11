@@ -57,6 +57,7 @@ public final class SetlistEditorFrame extends JFrame {
     private final List<JTable> tables;
     private final Consumer<SetlistProject> projectChangedHandler;
     private final BiConsumer<SetlistProject, File> projectSavedHandler;
+    private final AppFileLocations fileLocations;
     private final JButton addSessionButton;
     private final JButton removeSessionButton;
     private final JButton moveToAnotherSessionButton;
@@ -68,7 +69,7 @@ public final class SetlistEditorFrame extends JFrame {
 
     public SetlistEditorFrame(SetlistProject project, Consumer<SetlistProject> projectChangedHandler) {
         this(project, projectChangedHandler, (savedProject, outputFile) -> {
-        }, false);
+        }, false, new AppFileLocations());
     }
 
     SetlistEditorFrame(
@@ -76,12 +77,22 @@ public final class SetlistEditorFrame extends JFrame {
             Consumer<SetlistProject> projectChangedHandler,
             BiConsumer<SetlistProject, File> projectSavedHandler,
             boolean initiallyUnsaved) {
+        this(project, projectChangedHandler, projectSavedHandler, initiallyUnsaved, new AppFileLocations());
+    }
+
+    SetlistEditorFrame(
+            SetlistProject project,
+            Consumer<SetlistProject> projectChangedHandler,
+            BiConsumer<SetlistProject, File> projectSavedHandler,
+            boolean initiallyUnsaved,
+            AppFileLocations fileLocations) {
         super("香盤表を編集");
         this.sessionTabs = new JTabbedPane();
         this.tableModels = new ArrayList<>();
         this.tables = new ArrayList<>();
         this.projectChangedHandler = Objects.requireNonNull(projectChangedHandler, "projectChangedHandler must not be null");
         this.projectSavedHandler = Objects.requireNonNull(projectSavedHandler, "projectSavedHandler must not be null");
+        this.fileLocations = Objects.requireNonNull(fileLocations, "fileLocations must not be null");
         this.addSessionButton = AppTheme.quietButton("公演を追加");
         this.removeSessionButton = AppTheme.quietButton("公演を削除");
         this.moveToAnotherSessionButton = AppTheme.quietButton("別の公演へ");
@@ -602,10 +613,10 @@ public final class SetlistEditorFrame extends JFrame {
 
     private void saveProject() {
         stopTableEditing();
-        JFileChooser chooser = new JFileChooser(new File("Data/output"));
+        JFileChooser chooser = new JFileChooser(fileLocations.outputDirectory());
         chooser.setDialogTitle("編集可能な香盤表を保存");
         chooser.setFileFilter(new FileNameExtensionFilter("Excelファイル (*.xlsx)", "xlsx"));
-        chooser.setSelectedFile(new File("Data/output", "setlist-project.xlsx"));
+        chooser.setSelectedFile(fileLocations.defaultOutputFile("setlist-project.xlsx"));
         if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
             return;
         }
@@ -631,6 +642,7 @@ public final class SetlistEditorFrame extends JFrame {
         SetlistProject project = currentProject();
         File absoluteFile = outputFile.getAbsoluteFile();
         new XlsxSetlistProjectWriter().write(project, absoluteFile);
+        fileLocations.rememberOutputFile(absoluteFile);
         setUnsavedChanges(false);
         projectSavedHandler.accept(project, absoluteFile);
         return absoluteFile;

@@ -20,6 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -50,6 +51,8 @@ public class GuiComponentContractTest {
                 assertEquals("Setlist Studio", frame.getTitle());
                 JButton editButton = findButton(frame.getContentPane(), "編集");
                 JButton startEditingButton = findButton(frame.getContentPane(), "編集を開始");
+                JButton generateButton = findButton(frame.getContentPane(), "生成");
+                JButton chooseInputButton = findButton(frame.getContentPane(), "XLSXを選択");
                 JButton saveButton = findButton(frame.getContentPane(), "編集状態を保存");
                 JButton exportButton = findButton(frame.getContentPane(), "配布用XLSX出力");
                 assertNotNull(editButton);
@@ -57,11 +60,18 @@ public class GuiComponentContractTest {
                 assertNotNull(exportButton);
                 assertNotNull(findComponent(
                         frame.getContentPane(), JLabel.class,
-                        candidate -> "XLSXファイル".equals(candidate.getText())));
-                assertNull(findComponent(frame.getContentPane(), JTextField.class));
+                        candidate -> "入力XLSX".equals(candidate.getText())));
+                JTextField inputFileField = findComponent(frame.getContentPane(), JTextField.class);
+                assertNotNull(inputFileField);
+                assertFalse(inputFileField.isEditable());
+                assertEquals("XLSXファイルが選択されていません", inputFileField.getText());
+                assertNull(findComponent(frame.getContentPane(), JComboBox.class));
                 assertFalse(editButton.isEnabled());
+                assertFalse(startEditingButton.isEnabled());
+                assertFalse(generateButton.isEnabled());
                 assertFalse(saveButton.isEnabled());
                 assertFalse(exportButton.isEnabled());
+                assertTrue(chooseInputButton.isEnabled());
                 assertEquals(JFrame.DO_NOTHING_ON_CLOSE, frame.getDefaultCloseOperation());
                 assertNotNull(findComponent(
                         frame.getContentPane(), JLabel.class,
@@ -71,6 +81,15 @@ public class GuiComponentContractTest {
                 assertShortcut(frame, KeyEvent.VK_N, "new-project");
                 assertShortcut(frame, KeyEvent.VK_O, "open-project");
                 assertShortcut(frame, KeyEvent.VK_S, "save-project");
+
+                File inputFile = Files.createTempFile("selected-input-", ".xlsx").toFile();
+                inputFile.deleteOnExit();
+                frame.setSelectedInputFile(inputFile);
+
+                assertEquals(inputFile.getName(), inputFileField.getText());
+                assertEquals(inputFile.getAbsolutePath(), inputFileField.getToolTipText());
+                assertTrue(startEditingButton.isEnabled());
+                assertTrue(generateButton.isEnabled());
 
                 frame.displayGeneratedProject(projectWithOneEntry());
 

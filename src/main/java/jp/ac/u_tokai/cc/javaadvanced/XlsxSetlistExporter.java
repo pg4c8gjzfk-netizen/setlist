@@ -21,9 +21,9 @@ public class XlsxSetlistExporter {
 
     private final Path outputDirectory;
 
-    /** 通常の出力先である Data/output を使用します。 */
+    /** ユーザーのDocuments配下にある安定した出力先を使用します。 */
     public XlsxSetlistExporter() {
-        this(Path.of("Data", "output"));
+        this(new AppFileLocations().outputDirectory().toPath());
     }
 
     /** テストなどで出力先を差し替えます。 */
