@@ -38,7 +38,13 @@ public class ConsoleSetlistApplication {
                 return;
             }
 
-            List<PerformanceSheet> sourceSheets = new XlsxPerformanceReader().loadSheets(selectedFile);
+            List<PerformanceSheet> sourceSheets;
+            try {
+                sourceSheets = new XlsxPerformanceReader().loadSheets(selectedFile);
+            } catch (IllegalArgumentException exception) {
+                System.out.println("XLSXを読み込めませんでした。\n" + exception.getMessage());
+                return;
+            }
             if (sourceSheets.isEmpty()) {
                 System.out.println("読み込める公演シートがありませんでした。プログラムを終了します。");
                 return;

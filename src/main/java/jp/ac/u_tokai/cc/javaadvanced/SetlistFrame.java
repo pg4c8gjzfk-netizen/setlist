@@ -271,7 +271,13 @@ public class SetlistFrame extends JFrame {
             return;
         }
 
-        List<PerformanceSheet> sourceSheets = loadPerformanceSheets(selectedFile);
+        List<PerformanceSheet> sourceSheets;
+        try {
+            sourceSheets = loadPerformanceSheets(selectedFile);
+        } catch (IllegalArgumentException exception) {
+            showError(exception.getMessage());
+            return;
+        }
         if (sourceSheets.isEmpty()) {
             showError("演目データを読み込めませんでした。");
             return;
@@ -291,7 +297,13 @@ public class SetlistFrame extends JFrame {
             showError("読み込むデータファイルを選択してください。");
             return;
         }
-        List<PerformanceSheet> performanceSheets = loadPerformanceSheets(selectedFile);
+        List<PerformanceSheet> performanceSheets;
+        try {
+            performanceSheets = loadPerformanceSheets(selectedFile);
+        } catch (IllegalArgumentException exception) {
+            showError(exception.getMessage());
+            return;
+        }
         if (performanceSheets.isEmpty()) {
             showError("演目データを読み込めませんでした。");
             return;
