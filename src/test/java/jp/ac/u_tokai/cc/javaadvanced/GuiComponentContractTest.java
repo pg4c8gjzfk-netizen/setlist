@@ -9,17 +9,28 @@ import java.awt.Component;
 import java.awt.Container;
 import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
+import java.awt.Toolkit;
+import java.awt.event.KeyEvent;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JComponent;
 import javax.swing.JTable;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import org.junit.Assume;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /** 実際のSwing部品を検査するGUI契約テストです。 */
 public class GuiComponentContractTest {
+
+    @BeforeClass
+    public static void installApplicationTheme() {
+        AppTheme.install();
+    }
 
     @Test
     public void mainFrameEnablesEditOnlyAfterGeneratedProjectIsDisplayed() throws Exception {
@@ -32,6 +43,10 @@ public class GuiComponentContractTest {
                 assertNotNull(editButton);
                 assertNotNull(startEditingButton);
                 assertFalse(editButton.isEnabled());
+                assertNotNull(startEditingButton.getClientProperty(
+                        com.formdev.flatlaf.FlatClientProperties.STYLE));
+                assertShortcut(frame, KeyEvent.VK_N, "new-project");
+                assertShortcut(frame, KeyEvent.VK_O, "open-project");
 
                 frame.displayGeneratedProject(projectWithOneEntry());
 
@@ -59,6 +74,9 @@ public class GuiComponentContractTest {
                 assertNotNull(findButton(frame.getContentPane(), "指定順へ"));
                 assertNotNull(findButton(frame.getContentPane(), "別の公演へ"));
                 assertNotNull(findButton(frame.getContentPane(), "再生成"));
+                assertTrue(frame.getWidth() >= 1000);
+                assertShortcut(frame, KeyEvent.VK_S, "save-project");
+                assertShortcut(frame, KeyEvent.VK_R, "regenerate-project");
                 for (String buttonText : List.of("演目を削除", "再生成", "XLSX保存", "閉じる")) {
                     assertButtonFullyVisible(frame, buttonText);
                 }
@@ -88,6 +106,14 @@ public class GuiComponentContractTest {
         Rectangle visibleArea = new Rectangle(
                 0, 0, frame.getContentPane().getWidth(), frame.getContentPane().getHeight());
         assertTrue("ボタンが画面内に収まっていません: " + text, visibleArea.contains(bounds));
+    }
+
+    private void assertShortcut(JFrame frame, int keyCode, String expectedActionName) {
+        int menuMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+        Object actionName = frame.getRootPane()
+                .getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .get(KeyStroke.getKeyStroke(keyCode, menuMask));
+        assertEquals(expectedActionName, actionName);
     }
 
     private <T extends Component> T findComponent(Container root, Class<T> type) {

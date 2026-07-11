@@ -1,12 +1,21 @@
 package jp.ac.u_tokai.cc.javaadvanced;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.event.KeyEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
@@ -32,7 +41,14 @@ public class SetlistFrame extends JFrame {
     private final JTextField openerField;
     private final JTextField closerField;
     private final JTextArea resultArea;
+    private final JLabel modeHintLabel;
     private final JButton editButton;
+    private final JButton generateButton;
+    private final JButton startEditingButton;
+    private final JButton newButton;
+    private final JButton openProjectButton;
+    private final JButton excelButton;
+    private final JButton csvButton;
     private List<List<Performance>> generatedSessions;
     private SetlistProject currentProject;
 
@@ -45,7 +61,14 @@ public class SetlistFrame extends JFrame {
         this.openerField = new JTextField(12);
         this.closerField = new JTextField(12);
         this.resultArea = new JTextArea(22, 70);
-        this.editButton = new JButton("編集");
+        this.modeHintLabel = AppTheme.body("データファイルを選択してください。");
+        this.editButton = AppTheme.secondaryButton("編集");
+        this.generateButton = AppTheme.secondaryButton("生成");
+        this.startEditingButton = AppTheme.primaryButton("編集を開始");
+        this.newButton = AppTheme.quietButton("新規作成");
+        this.openProjectButton = AppTheme.quietButton("編集済みXLSXを開く");
+        this.excelButton = AppTheme.quietButton("Excel出力");
+        this.csvButton = AppTheme.quietButton("CSV出力");
         this.generatedSessions = List.of();
         this.currentProject = SetlistProjectFactory.newEmptyProject();
 
@@ -56,44 +79,118 @@ public class SetlistFrame extends JFrame {
 
     private void setupWindow() {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLayout(new BorderLayout(8, 8));
+        setIconImage(AppIcon.create(64));
+        JPanel root = AppTheme.page(new BorderLayout(0, 18));
+        root.setBorder(AppTheme.pagePadding());
+        setContentPane(root);
+
         resultArea.setEditable(false);
-        resultArea.setLineWrap(false);
+        resultArea.setLineWrap(true);
+        resultArea.setWrapStyleWord(true);
+        resultArea.setText("まだプレビューはありません。\nデータを選び、「編集を開始」または「生成」を選択してください。");
+        AppTheme.stylePreview(resultArea);
         editButton.setEnabled(false);
 
-        add(createInputPanel(), BorderLayout.NORTH);
-        add(new JScrollPane(resultArea), BorderLayout.CENTER);
-        add(createActionPanel(), BorderLayout.SOUTH);
-        pack();
+        root.add(createHeaderPanel(), BorderLayout.NORTH);
+
+        JPanel workspace = AppTheme.page(new BorderLayout(0, 16));
+        workspace.add(createInputPanel(), BorderLayout.NORTH);
+        workspace.add(createPreviewPanel(), BorderLayout.CENTER);
+        root.add(workspace, BorderLayout.CENTER);
+        root.add(createActionPanel(), BorderLayout.SOUTH);
+
+        getRootPane().setDefaultButton(startEditingButton);
+        AppTheme.bindMenuShortcut(getRootPane(), "new-project", KeyEvent.VK_N, newButton::doClick);
+        AppTheme.bindMenuShortcut(getRootPane(), "open-project", KeyEvent.VK_O, openProjectButton::doClick);
+        AppTheme.bindMenuShortcut(getRootPane(), "generate-setlist", KeyEvent.VK_G, generateButton::doClick);
+        setMinimumSize(new Dimension(980, 660));
+        setSize(1120, 760);
         setLocationRelativeTo(null);
     }
 
+    private JPanel createHeaderPanel() {
+        JPanel panel = AppTheme.page(new BorderLayout(20, 0));
+        JPanel titleStack = transparentBoxPanel(BoxLayout.Y_AXIS);
+        titleStack.add(AppTheme.title("Setlist Studio"));
+        titleStack.add(Box.createVerticalStrut(5));
+        titleStack.add(AppTheme.body("出演者の流れを整え、迷いなく本番へ進める香盤表ワークスペース"));
+
+        JLabel localBadge = AppTheme.statusPill("ローカル編集", new java.awt.Color(0x248A3D));
+
+        panel.add(titleStack, BorderLayout.WEST);
+        panel.add(localBadge, BorderLayout.EAST);
+        return panel;
+    }
+
     private JPanel createInputPanel() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        panel.add(new JLabel("データファイル"));
-        panel.add(dataFileBox);
-        panel.add(new JLabel("公演数"));
-        panel.add(sessionSpinner);
-        panel.add(new JLabel("各公演の上限数"));
-        panel.add(capacityField);
-        panel.add(new JLabel("オープニング"));
-        panel.add(openerField);
-        panel.add(new JLabel("トリ"));
-        panel.add(closerField);
+        JPanel panel = AppTheme.card(new BorderLayout(0, 16));
+
+        JPanel heading = transparentBoxPanel(BoxLayout.Y_AXIS);
+        heading.add(AppTheme.heading("入力と生成条件"));
+        heading.add(Box.createVerticalStrut(4));
+        heading.add(AppTheme.body("XLSXは元シートを公演として保持し、CSVは指定した公演数へ配分します。"));
+        panel.add(heading, BorderLayout.NORTH);
+
+        JPanel fields = new JPanel(new GridBagLayout());
+        fields.setOpaque(false);
+        GridBagConstraints constraints = new GridBagConstraints();
+        constraints.gridy = 0;
+        constraints.anchor = GridBagConstraints.NORTHWEST;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.insets = new Insets(0, 0, 0, 12);
+
+        constraints.gridx = 0;
+        constraints.weightx = 1.0;
+        fields.add(createFieldGroup("データファイル", dataFileBox, 340), constraints);
+
+        JButton reloadButton = AppTheme.quietButton("再読込");
+        reloadButton.setToolTipText("Dataフォルダの入力ファイル一覧を更新します");
+        reloadButton.addActionListener(event -> loadDataFiles());
+        constraints.gridx = 1;
+        constraints.weightx = 0;
+        constraints.anchor = GridBagConstraints.SOUTHWEST;
+        fields.add(reloadButton, constraints);
+
+        constraints.gridx = 2;
+        constraints.anchor = GridBagConstraints.NORTHWEST;
+        fields.add(createFieldGroup("公演数", sessionSpinner, 84), constraints);
+        constraints.gridx = 3;
+        fields.add(createFieldGroup("各公演の上限", capacityField, 110), constraints);
+        constraints.gridx = 4;
+        fields.add(createFieldGroup("オープニング", openerField, 145), constraints);
+        constraints.gridx = 5;
+        constraints.insets = new Insets(0, 0, 0, 0);
+        fields.add(createFieldGroup("トリ", closerField, 145), constraints);
+        panel.add(fields, BorderLayout.CENTER);
+
+        modeHintLabel.setForeground(AppTheme.ACCENT);
+        panel.add(modeHintLabel, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private JPanel createPreviewPanel() {
+        JPanel panel = AppTheme.card(new BorderLayout(0, 14));
+        JPanel header = new JPanel(new BorderLayout(16, 0));
+        header.setOpaque(false);
+
+        JPanel text = transparentBoxPanel(BoxLayout.Y_AXIS);
+        text.add(AppTheme.heading("香盤表プレビュー"));
+        text.add(Box.createVerticalStrut(3));
+        text.add(AppTheme.body("生成結果と現在の編集状態を、保存前に確認できます。"));
+        header.add(text, BorderLayout.WEST);
+
+        editButton.setToolTipText("現在の香盤表を公演タブで編集します");
+        header.add(editButton, BorderLayout.EAST);
+        panel.add(header, BorderLayout.NORTH);
+
+        JScrollPane previewScroll = AppTheme.scroll(resultArea);
+        previewScroll.setBorder(BorderFactory.createLineBorder(new java.awt.Color(0xE7E7EB)));
+        panel.add(previewScroll, BorderLayout.CENTER);
         return panel;
     }
 
     private JPanel createActionPanel() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton reloadButton = new JButton("再読込");
-        JButton generateButton = new JButton("生成");
-        JButton startEditingButton = new JButton("編集を開始");
-        JButton newButton = new JButton("新規作成");
-        JButton openProjectButton = new JButton("編集済みXLSXを開く");
-        JButton excelButton = new JButton("Excel出力");
-        JButton csvButton = new JButton("CSV出力");
-
-        reloadButton.addActionListener(event -> loadDataFiles());
+        JPanel panel = AppTheme.page(new BorderLayout(16, 0));
         generateButton.addActionListener(event -> generateSetlist());
         startEditingButton.addActionListener(event -> startEditingSelectedData());
         newButton.addActionListener(event -> openEditor(SetlistProjectFactory.newEmptyProject()));
@@ -102,14 +199,45 @@ public class SetlistFrame extends JFrame {
         excelButton.addActionListener(event -> exportGeneratedSetlist(new XlsxSetlistExporter(), "output_setlist.xlsx"));
         csvButton.addActionListener(event -> exportGeneratedSetlist(new CsvSetlistExporter(), "output_setlist.csv"));
 
-        panel.add(reloadButton);
-        panel.add(generateButton);
-        panel.add(startEditingButton);
-        panel.add(newButton);
-        panel.add(openProjectButton);
-        panel.add(editButton);
-        panel.add(excelButton);
-        panel.add(csvButton);
+        newButton.setToolTipText("空の香盤表から作成します（Ctrl/Command+N）");
+        openProjectButton.setToolTipText("編集状態を保持したXLSXを開きます（Ctrl/Command+O）");
+        generateButton.setToolTipText("入力データから曲順を自動生成します（Ctrl/Command+G）");
+        startEditingButton.setToolTipText("入力データをそのまま公演タブで開きます");
+
+        JPanel leftActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        leftActions.setOpaque(false);
+        leftActions.add(newButton);
+        leftActions.add(openProjectButton);
+
+        JPanel rightActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        rightActions.setOpaque(false);
+        rightActions.add(csvButton);
+        rightActions.add(excelButton);
+        rightActions.add(generateButton);
+        rightActions.add(startEditingButton);
+
+        panel.add(leftActions, BorderLayout.WEST);
+        panel.add(rightActions, BorderLayout.EAST);
+        return panel;
+    }
+
+    private JPanel createFieldGroup(String labelText, Component component, int width) {
+        JPanel group = transparentBoxPanel(BoxLayout.Y_AXIS);
+        JLabel label = AppTheme.fieldLabel(labelText);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        component.setPreferredSize(new Dimension(width, 38));
+        component.setMinimumSize(new Dimension(Math.min(width, 80), 38));
+        component.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
+        group.add(label);
+        group.add(Box.createVerticalStrut(6));
+        group.add(component);
+        return group;
+    }
+
+    private JPanel transparentBoxPanel(int axis) {
+        JPanel panel = new JPanel();
+        panel.setOpaque(false);
+        panel.setLayout(new BoxLayout(panel, axis));
         return panel;
     }
 
@@ -118,7 +246,8 @@ public class SetlistFrame extends JFrame {
         File dataDir = new File(DATA_DIRECTORY);
         File[] files = dataDir.listFiles((directory, name) -> name.endsWith(".csv") || name.endsWith(".xlsx"));
         if (files == null || files.length == 0) {
-            resultArea.setText("Dataフォルダに .csv または .xlsx ファイルがありません。");
+            modeHintLabel.setText("Dataフォルダに .csv または .xlsx ファイルがありません。");
+            resultArea.setText("入力データが見つかりません。\nDataフォルダへCSVまたはXLSXを追加し、「再読込」を押してください。");
             return;
         }
         for (File file : files) {
@@ -215,10 +344,10 @@ public class SetlistFrame extends JFrame {
             return;
         }
         if (sheetScoped) {
-            resultArea.setText(
-                    "XLSXは各シートを独立した公演として生成します。公演数・上限数によるシート間配分は行いません。");
+            modeHintLabel.setText(
+                    "● XLSXモード：各シートを独立した公演として保持します。シート間の再配分は行いません。");
         } else {
-            resultArea.setText("データファイルを選択して、「生成」または「編集を開始」を押してください。");
+            modeHintLabel.setText("● CSVモード：公演数と上限を使って演目を配分します。");
         }
     }
 

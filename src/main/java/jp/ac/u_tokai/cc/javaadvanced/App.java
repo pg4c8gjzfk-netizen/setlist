@@ -19,11 +19,13 @@ public class App {
      * @param args コマンドライン引数
      */
     public static void main(String[] args) {
+        AppTheme.configurePlatformProperties();
         if (GraphicsEnvironment.isHeadless() || hasConsoleOption(args)) {
             new ConsoleSetlistApplication().run();
             return;
         }
 
+        AppTheme.install();
         SwingUtilities.invokeLater(() -> new SetlistFrame().showScreen());
     }
 

@@ -1,8 +1,10 @@
 package jp.ac.u_tokai.cc.javaadvanced;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.GridLayout;
+import java.awt.event.KeyEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -12,6 +14,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JFileChooser;
@@ -19,9 +24,11 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
 import javax.swing.JTable;
 import javax.swing.JTabbedPane;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 /** 公演ごとの演目を直接編集し、再生成できる画面です。 */
@@ -56,31 +63,74 @@ public final class SetlistEditorFrame extends JFrame {
 
     private void setupWindow() {
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        setLayout(new BorderLayout(8, 8));
-        add(new JLabel("曲名・時間・出演者を編集し、固定する演目はチェックしてから「再生成」を押してください。"), BorderLayout.NORTH);
-        add(sessionTabs, BorderLayout.CENTER);
-        add(createActionPanel(), BorderLayout.SOUTH);
-        setSize(920, 560);
-        setLocationByPlatform(true);
+        setIconImage(AppIcon.create(64));
+        JPanel root = AppTheme.page(new BorderLayout(0, 16));
+        root.setBorder(AppTheme.pagePadding());
+        setContentPane(root);
+
+        sessionTabs.putClientProperty(
+                com.formdev.flatlaf.FlatClientProperties.STYLE,
+                "tabArc: 12; tabHeight: 40; selectedBackground: #FFFFFF; hoverColor: #ECECF0");
+
+        root.add(createHeaderPanel(), BorderLayout.NORTH);
+        JPanel editorCard = AppTheme.card(new BorderLayout());
+        editorCard.add(sessionTabs, BorderLayout.CENTER);
+        root.add(editorCard, BorderLayout.CENTER);
+        root.add(createActionPanel(), BorderLayout.SOUTH);
+
+        AppTheme.bindMenuShortcut(getRootPane(), "save-project", KeyEvent.VK_S, this::saveProject);
+        AppTheme.bindMenuShortcut(getRootPane(), "regenerate-project", KeyEvent.VK_R, this::regenerate);
+        AppTheme.bindMenuShortcut(getRootPane(), "close-editor", KeyEvent.VK_W, this::dispose);
+
+        setMinimumSize(new Dimension(1000, 650));
+        setSize(1180, 760);
+        setLocationRelativeTo(null);
+    }
+
+    private JPanel createHeaderPanel() {
+        JPanel panel = AppTheme.page(new BorderLayout(20, 0));
+        JPanel titleStack = transparentBoxPanel(BoxLayout.Y_AXIS);
+        titleStack.add(AppTheme.title("香盤表を編集"));
+        titleStack.add(Box.createVerticalStrut(5));
+        titleStack.add(AppTheme.body("曲順・時間・出演者を整え、動かしたくない演目だけを固定します。"));
+
+        JButton regenerateButton = AppTheme.primaryButton("再生成");
+        JButton saveButton = AppTheme.secondaryButton("XLSX保存");
+        JButton closeButton = AppTheme.quietButton("閉じる");
+        regenerateButton.setToolTipText(
+                "固定した演目を残し、各公演内の未固定演目だけを並べ直します（Ctrl/Command+R）");
+        saveButton.setToolTipText("編集状態と固定情報を保持したXLSXを保存します（Ctrl/Command+S）");
+
+        regenerateButton.addActionListener(event -> regenerate());
+        saveButton.addActionListener(event -> saveProject());
+        closeButton.addActionListener(event -> dispose());
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        actions.setOpaque(false);
+        actions.add(closeButton);
+        actions.add(saveButton);
+        actions.add(regenerateButton);
+
+        panel.add(titleStack, BorderLayout.WEST);
+        panel.add(actions, BorderLayout.EAST);
+        return panel;
     }
 
     private JPanel createActionPanel() {
-        JPanel panel = new JPanel(new GridLayout(2, 1));
-        JPanel sessionAndMovePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JPanel entryAndProjectPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton addSessionButton = new JButton("公演を追加");
-        JButton removeSessionButton = new JButton("公演を削除");
-        JButton moveUpButton = new JButton("上へ");
-        JButton moveDownButton = new JButton("下へ");
-        JButton moveFirstButton = new JButton("先頭へ");
-        JButton moveLastButton = new JButton("末尾へ");
-        JButton moveToPositionButton = new JButton("指定順へ");
-        JButton moveToAnotherSessionButton = new JButton("別の公演へ");
-        JButton addEntryButton = new JButton("演目を追加");
-        JButton removeEntryButton = new JButton("演目を削除");
-        JButton regenerateButton = new JButton("再生成");
-        JButton saveButton = new JButton("XLSX保存");
-        JButton closeButton = new JButton("閉じる");
+        JPanel panel = AppTheme.card(new BorderLayout());
+
+        JButton addSessionButton = AppTheme.quietButton("公演を追加");
+        JButton removeSessionButton = AppTheme.quietButton("公演を削除");
+        JButton moveUpButton = AppTheme.quietButton("上へ");
+        JButton moveDownButton = AppTheme.quietButton("下へ");
+        JButton moveFirstButton = AppTheme.quietButton("先頭へ");
+        JButton moveLastButton = AppTheme.quietButton("末尾へ");
+        JButton moveToPositionButton = AppTheme.quietButton("指定順へ");
+        JButton moveToAnotherSessionButton = AppTheme.quietButton("別の公演へ");
+        JButton addEntryButton = AppTheme.quietButton("演目を追加");
+        JButton removeEntryButton = AppTheme.quietButton("演目を削除");
+        AppTheme.styleDanger(removeSessionButton);
+        AppTheme.styleDanger(removeEntryButton);
 
         addSessionButton.addActionListener(event -> addSession());
         removeSessionButton.addActionListener(event -> removeSelectedSession());
@@ -92,27 +142,52 @@ public final class SetlistEditorFrame extends JFrame {
         moveToAnotherSessionButton.addActionListener(event -> moveSelectedEntryToAnotherSession());
         addEntryButton.addActionListener(event -> addEntry());
         removeEntryButton.addActionListener(event -> removeSelectedEntry());
-        regenerateButton.addActionListener(event -> regenerate());
-        saveButton.addActionListener(event -> saveProject());
-        closeButton.addActionListener(event -> dispose());
 
-        sessionAndMovePanel.add(addSessionButton);
-        sessionAndMovePanel.add(removeSessionButton);
-        sessionAndMovePanel.add(moveUpButton);
-        sessionAndMovePanel.add(moveDownButton);
-        sessionAndMovePanel.add(moveFirstButton);
-        sessionAndMovePanel.add(moveLastButton);
-        sessionAndMovePanel.add(moveToPositionButton);
-        sessionAndMovePanel.add(moveToAnotherSessionButton);
+        JPanel groups = transparentBoxPanel(BoxLayout.X_AXIS);
+        groups.add(createToolbarGroup("公演", addSessionButton, removeSessionButton, moveToAnotherSessionButton));
+        groups.add(Box.createHorizontalStrut(16));
+        groups.add(createSeparator());
+        groups.add(Box.createHorizontalStrut(16));
+        groups.add(createToolbarGroup(
+                "曲順", moveUpButton, moveDownButton, moveFirstButton, moveLastButton, moveToPositionButton));
+        groups.add(Box.createHorizontalGlue());
+        groups.add(createSeparator());
+        groups.add(Box.createHorizontalStrut(16));
+        groups.add(createToolbarGroup("演目", addEntryButton, removeEntryButton));
 
-        entryAndProjectPanel.add(addEntryButton);
-        entryAndProjectPanel.add(removeEntryButton);
-        entryAndProjectPanel.add(regenerateButton);
-        entryAndProjectPanel.add(saveButton);
-        entryAndProjectPanel.add(closeButton);
+        panel.add(groups, BorderLayout.CENTER);
+        return panel;
+    }
 
-        panel.add(sessionAndMovePanel);
-        panel.add(entryAndProjectPanel);
+    private JPanel createToolbarGroup(String title, JButton... buttons) {
+        JPanel group = transparentBoxPanel(BoxLayout.Y_AXIS);
+        JLabel label = AppTheme.fieldLabel(title);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        group.add(label);
+        group.add(Box.createVerticalStrut(7));
+
+        JPanel buttonRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        buttonRow.setOpaque(false);
+        buttonRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        for (JButton button : buttons) {
+            buttonRow.add(button);
+        }
+        group.add(buttonRow);
+        return group;
+    }
+
+    private JSeparator createSeparator() {
+        JSeparator separator = new JSeparator(SwingConstants.VERTICAL);
+        separator.setForeground(AppTheme.BORDER);
+        separator.setMaximumSize(new Dimension(1, 54));
+        separator.setPreferredSize(new Dimension(1, 54));
+        return separator;
+    }
+
+    private JPanel transparentBoxPanel(int axis) {
+        JPanel panel = new JPanel();
+        panel.setOpaque(false);
+        panel.setLayout(new BoxLayout(panel, axis));
         return panel;
     }
 
@@ -143,9 +218,20 @@ public final class SetlistEditorFrame extends JFrame {
         JTable table = new JTable(model);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setAutoCreateRowSorter(false);
+        AppTheme.styleTable(table);
+        table.getColumnModel().getColumn(0).setPreferredWidth(60);
+        table.getColumnModel().getColumn(0).setMaxWidth(76);
+        table.getColumnModel().getColumn(1).setPreferredWidth(280);
+        table.getColumnModel().getColumn(2).setPreferredWidth(100);
+        table.getColumnModel().getColumn(2).setMaxWidth(130);
+        table.getColumnModel().getColumn(3).setPreferredWidth(360);
+        table.getColumnModel().getColumn(4).setPreferredWidth(72);
+        table.getColumnModel().getColumn(4).setMaxWidth(86);
         tableModels.add(model);
         tables.add(table);
-        sessionTabs.addTab(name, new JScrollPane(table));
+        JScrollPane scrollPane = AppTheme.scroll(table);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
+        sessionTabs.addTab(name, scrollPane);
     }
 
     private SetlistEntryTableModel.PerformerChangeScope choosePerformerChangeScope(
