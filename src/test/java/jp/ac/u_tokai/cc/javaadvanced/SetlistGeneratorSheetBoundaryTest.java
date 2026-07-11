@@ -26,7 +26,7 @@ public class SetlistGeneratorSheetBoundaryTest {
 
         SetlistGenerator generator = new SetlistGenerator();
         for (int attempt = 0; attempt < 100; attempt++) {
-            List<PerformanceSheet> generated = generator.generateWithinSheets(sourceSheets, "", "");
+            List<PerformanceSheet> generated = generator.generateWithinSheets(sourceSheets);
 
             assertEquals(List.of("第1公演", "第2公演"), generated.stream()
                     .map(PerformanceSheet::name)

@@ -27,7 +27,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 /** 自動生成、編集画面への遷移、既存形式での出力を行うメイン画面です。 */
@@ -36,8 +35,6 @@ public class SetlistFrame extends JFrame {
     private static final String DATA_DIRECTORY = "Data";
 
     private final JComboBox<File> dataFileBox;
-    private final JTextField openerField;
-    private final JTextField closerField;
     private final JTextArea resultArea;
     private final JLabel sheetHintLabel;
     private final JButton editButton;
@@ -53,8 +50,6 @@ public class SetlistFrame extends JFrame {
     public SetlistFrame() {
         super("Setlist Studio");
         this.dataFileBox = new JComboBox<>();
-        this.openerField = new JTextField(12);
-        this.closerField = new JTextField(12);
         this.resultArea = new JTextArea(22, 70);
         this.sheetHintLabel = AppTheme.body("XLSXファイルを選択してください。");
         this.editButton = AppTheme.secondaryButton("編集");
@@ -137,7 +132,7 @@ public class SetlistFrame extends JFrame {
         JPanel panel = AppTheme.card(new BorderLayout(0, 16));
 
         JPanel heading = transparentBoxPanel(BoxLayout.Y_AXIS);
-        heading.add(AppTheme.heading("入力と生成条件"));
+        heading.add(AppTheme.heading("入力ファイル"));
         heading.add(Box.createVerticalStrut(4));
         heading.add(AppTheme.body("各ワークシートを独立した公演として保持し、シート内の曲順だけを生成します。"));
         panel.add(heading, BorderLayout.NORTH);
@@ -162,12 +157,6 @@ public class SetlistFrame extends JFrame {
         constraints.anchor = GridBagConstraints.SOUTHWEST;
         fields.add(reloadButton, constraints);
 
-        constraints.gridx = 2;
-        constraints.anchor = GridBagConstraints.NORTHWEST;
-        fields.add(createFieldGroup("オープニング", openerField, 180), constraints);
-        constraints.gridx = 3;
-        constraints.insets = new Insets(0, 0, 0, 0);
-        fields.add(createFieldGroup("トリ", closerField, 180), constraints);
         panel.add(fields, BorderLayout.CENTER);
 
         sheetHintLabel.setForeground(AppTheme.ACCENT);
@@ -285,8 +274,7 @@ public class SetlistFrame extends JFrame {
             return;
         }
 
-        generatedSheets = new SetlistGenerator().generateWithinSheets(
-                sourceSheets, openerField.getText().trim(), closerField.getText().trim());
+        generatedSheets = new SetlistGenerator().generateWithinSheets(sourceSheets);
         displayGeneratedProject(SetlistProjectFactory.fromImportedSheets(generatedSheets));
     }
 

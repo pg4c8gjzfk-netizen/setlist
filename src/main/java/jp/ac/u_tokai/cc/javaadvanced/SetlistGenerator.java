@@ -12,6 +12,11 @@ import java.util.Objects;
  */
 public class SetlistGenerator {
 
+    /** 固定候補を指定せず、各入力シート内の曲順だけを生成します。 */
+    public List<PerformanceSheet> generateWithinSheets(List<PerformanceSheet> sourceSheets) {
+        return generateWithinSheets(sourceSheets, "", "");
+    }
+
     /**
      * 入力シートごとに独立して曲順を生成します。
      *

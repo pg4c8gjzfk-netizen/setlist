@@ -3,6 +3,7 @@ package jp.ac.u_tokai.cc.javaadvanced;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.awt.Component;
@@ -19,6 +20,7 @@ import javax.swing.JFrame;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import org.junit.Assume;
@@ -48,6 +50,7 @@ public class GuiComponentContractTest {
                 assertNotNull(findComponent(
                         frame.getContentPane(), JLabel.class,
                         candidate -> "XLSXファイル".equals(candidate.getText())));
+                assertNull(findComponent(frame.getContentPane(), JTextField.class));
                 assertFalse(editButton.isEnabled());
                 assertNotNull(startEditingButton.getClientProperty(
                         com.formdev.flatlaf.FlatClientProperties.STYLE));
