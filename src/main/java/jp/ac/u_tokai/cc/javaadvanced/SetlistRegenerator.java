@@ -53,7 +53,8 @@ public final class SetlistRegenerator {
         for (SetlistSession session : currentProject.sessions()) {
             regeneratedSessions.add(regenerateSession(session));
         }
-        SetlistProject regeneratedProject = new SetlistProject(regeneratedSessions);
+        SetlistProject regeneratedProject = new SetlistProject(
+                regeneratedSessions, currentProject.sheetBoundariesLocked());
         verifyEntriesPreserved(currentProject, regeneratedProject);
         verifySessionMembershipPreserved(currentProject, regeneratedProject);
         return regeneratedProject;

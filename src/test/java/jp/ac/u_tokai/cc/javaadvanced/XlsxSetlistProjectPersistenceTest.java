@@ -27,7 +27,8 @@ public class XlsxSetlistProjectPersistenceTest {
         new XlsxSetlistProjectWriter().write(project, output);
         SetlistProject restored = new XlsxSetlistProjectReader().read(output);
 
-        assertEquals(project, restored);
+        assertEquals(project.sessions(), restored.sessions());
+        assertTrue(restored.sheetBoundariesLocked());
         assertEquals(project.sessions().stream().mapToInt(session -> session.entries().size()).sum(),
                 new SetlistRegenerator().regenerate(restored).sessions().stream()
                         .mapToInt(session -> session.entries().size()).sum());
@@ -48,7 +49,9 @@ public class XlsxSetlistProjectPersistenceTest {
 
         new XlsxSetlistProjectWriter().write(project, output);
 
-        assertEquals(project, new XlsxSetlistProjectReader().read(output));
+        SetlistProject restored = new XlsxSetlistProjectReader().read(output);
+        assertEquals(project.sessions(), restored.sessions());
+        assertTrue(restored.sheetBoundariesLocked());
     }
 
     @Test

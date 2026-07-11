@@ -112,7 +112,7 @@ public final class XlsxSetlistProjectReader {
         if (sessions.isEmpty() || metadataContent.sessionNames().size() != sessions.size()) {
             throw new IllegalArgumentException("公演シートがありません。");
         }
-        SetlistProject project = new SetlistProject(sessions);
+        SetlistProject project = new SetlistProject(sessions, true);
         new SetlistRegenerator().validate(project);
         return project;
     }

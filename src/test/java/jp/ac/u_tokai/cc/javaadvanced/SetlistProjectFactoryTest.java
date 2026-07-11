@@ -1,6 +1,8 @@
 package jp.ac.u_tokai.cc.javaadvanced;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,6 +22,7 @@ public class SetlistProjectFactoryTest {
         assertEquals(
                 project.sessions().get(0).entries().get(0).sourcePerformanceId(),
                 project.sessions().get(1).entries().get(0).sourcePerformanceId());
+        assertFalse(project.sheetBoundariesLocked());
     }
 
     @Test
@@ -37,6 +40,7 @@ public class SetlistProjectFactoryTest {
         assertEquals(List.of("入力順1", "入力順2"), project.sessions().get(0).entries().stream()
                 .map(SetlistEntry::title)
                 .toList());
+        assertFalse(project.sheetBoundariesLocked());
     }
 
     @Test
@@ -57,5 +61,6 @@ public class SetlistProjectFactoryTest {
         assertEquals(List.of("第2公演の曲"), project.sessions().get(1).entries().stream()
                 .map(SetlistEntry::title)
                 .toList());
+        assertTrue(project.sheetBoundariesLocked());
     }
 }

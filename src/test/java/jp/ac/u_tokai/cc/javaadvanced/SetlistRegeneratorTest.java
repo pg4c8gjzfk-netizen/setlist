@@ -60,12 +60,13 @@ public class SetlistRegeneratorTest {
         SetlistEntry secondSessionSecond = entry("第2公演B", false, FixedPosition.NONE, -1);
         SetlistProject project = new SetlistProject(List.of(
                 new SetlistSession("第1公演", List.of(firstSessionFirst, firstSessionSecond)),
-                new SetlistSession("第2公演", List.of(secondSessionFirst, secondSessionSecond))));
+                new SetlistSession("第2公演", List.of(secondSessionFirst, secondSessionSecond))), true);
 
         SetlistProject regenerated = new SetlistRegenerator(new Random(5)).regenerate(project);
 
         assertSessionContainsExactly(regenerated.sessions().get(0), firstSessionFirst, firstSessionSecond);
         assertSessionContainsExactly(regenerated.sessions().get(1), secondSessionFirst, secondSessionSecond);
+        assertTrue(regenerated.sheetBoundariesLocked());
     }
 
     @Test

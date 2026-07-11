@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JTable;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
@@ -38,6 +39,7 @@ public class GuiComponentContractTest {
         runOnEventDispatchThread(() -> {
             SetlistFrame frame = new SetlistFrame();
             try {
+                assertEquals("Setlist Studio", frame.getTitle());
                 JButton editButton = findButton(frame.getContentPane(), "編集");
                 JButton startEditingButton = findButton(frame.getContentPane(), "編集を開始");
                 assertNotNull(editButton);
@@ -72,7 +74,7 @@ public class GuiComponentContractTest {
                 assertNotNull(findButton(frame.getContentPane(), "先頭へ"));
                 assertNotNull(findButton(frame.getContentPane(), "末尾へ"));
                 assertNotNull(findButton(frame.getContentPane(), "指定順へ"));
-                assertNotNull(findButton(frame.getContentPane(), "別の公演へ"));
+                assertTrue(findButton(frame.getContentPane(), "別の公演へ").isEnabled());
                 assertNotNull(findButton(frame.getContentPane(), "再生成"));
                 assertTrue(frame.getWidth() >= 1000);
                 assertShortcut(frame, KeyEvent.VK_S, "save-project");
@@ -80,6 +82,31 @@ public class GuiComponentContractTest {
                 for (String buttonText : List.of("演目を削除", "再生成", "XLSX保存", "閉じる")) {
                     assertButtonFullyVisible(frame, buttonText);
                 }
+            } finally {
+                frame.dispose();
+            }
+        });
+    }
+
+    @Test
+    public void editorPreventsImportedXlsxSheetBoundaryChanges() throws Exception {
+        Assume.assumeFalse("画面表示できない環境ではSwing契約テストを実行しません。", GraphicsEnvironment.isHeadless());
+        runOnEventDispatchThread(() -> {
+            SetlistProject unlocked = projectWithOneEntry();
+            SetlistProject locked = new SetlistProject(unlocked.sessions(), true);
+            SetlistEditorFrame frame = new SetlistEditorFrame(locked, project -> {
+            });
+            try {
+                frame.setVisible(true);
+                assertFalse(findButton(frame.getContentPane(), "公演を追加").isEnabled());
+                assertFalse(findButton(frame.getContentPane(), "公演を削除").isEnabled());
+                assertFalse(findButton(frame.getContentPane(), "別の公演へ").isEnabled());
+                JLabel status = findComponent(
+                        frame.getContentPane(), JLabel.class,
+                        candidate -> "シート境界を保持".equals(candidate.getText()));
+                assertNotNull(status);
+                assertTrue(status.isVisible());
+                assertTrue(frame.currentProject().sheetBoundariesLocked());
             } finally {
                 frame.dispose();
             }

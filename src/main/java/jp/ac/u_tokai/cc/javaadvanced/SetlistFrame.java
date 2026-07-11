@@ -8,6 +8,8 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.KeyEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -16,8 +18,10 @@ import java.util.Map;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
@@ -54,7 +58,7 @@ public class SetlistFrame extends JFrame {
 
     /** メイン画面を作成します。 */
     public SetlistFrame() {
-        super("セットリスト自動生成");
+        super("Setlist Studio");
         this.dataFileBox = new JComboBox<>();
         this.sessionSpinner = new JSpinner(new SpinnerNumberModel(2, 1, 20, 1));
         this.capacityField = new JTextField(6);
@@ -82,7 +86,18 @@ public class SetlistFrame extends JFrame {
         setIconImage(AppIcon.create(64));
         JPanel root = AppTheme.page(new BorderLayout(0, 18));
         root.setBorder(AppTheme.pagePadding());
+        root.setFocusable(true);
         setContentPane(root);
+
+        DefaultListCellRenderer fileRenderer = new DefaultListCellRenderer();
+        dataFileBox.setRenderer((list, value, index, isSelected, cellHasFocus) -> {
+            Component rendered = fileRenderer.getListCellRendererComponent(
+                    list, value, index, isSelected, cellHasFocus);
+            if (rendered instanceof JLabel label) {
+                label.setText(value == null ? "" : value.getName());
+            }
+            return rendered;
+        });
 
         resultArea.setEditable(false);
         resultArea.setLineWrap(true);
@@ -103,6 +118,12 @@ public class SetlistFrame extends JFrame {
         AppTheme.bindMenuShortcut(getRootPane(), "new-project", KeyEvent.VK_N, newButton::doClick);
         AppTheme.bindMenuShortcut(getRootPane(), "open-project", KeyEvent.VK_O, openProjectButton::doClick);
         AppTheme.bindMenuShortcut(getRootPane(), "generate-setlist", KeyEvent.VK_G, generateButton::doClick);
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowOpened(WindowEvent event) {
+                root.requestFocusInWindow();
+            }
+        });
         setMinimumSize(new Dimension(980, 660));
         setSize(1120, 760);
         setLocationRelativeTo(null);
@@ -118,7 +139,7 @@ public class SetlistFrame extends JFrame {
         JLabel localBadge = AppTheme.statusPill("ローカル編集", new java.awt.Color(0x248A3D));
 
         panel.add(titleStack, BorderLayout.WEST);
-        panel.add(localBadge, BorderLayout.EAST);
+        panel.add(compactHolder(localBadge), BorderLayout.EAST);
         return panel;
     }
 
@@ -228,10 +249,20 @@ public class SetlistFrame extends JFrame {
         component.setPreferredSize(new Dimension(width, 38));
         component.setMinimumSize(new Dimension(Math.min(width, 80), 38));
         component.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
+        if (component instanceof JComponent swingComponent) {
+            swingComponent.setAlignmentX(Component.LEFT_ALIGNMENT);
+        }
         group.add(label);
         group.add(Box.createVerticalStrut(6));
         group.add(component);
         return group;
+    }
+
+    private JPanel compactHolder(Component component) {
+        JPanel holder = new JPanel(new GridBagLayout());
+        holder.setOpaque(false);
+        holder.add(component);
+        return holder;
     }
 
     private JPanel transparentBoxPanel(int axis) {
@@ -330,7 +361,17 @@ public class SetlistFrame extends JFrame {
             return;
         }
         generatedSessions = List.of();
-        openEditor(SetlistProjectFactory.fromImportedSheets(performanceSheets));
+        openEditor(createImportedProject(selectedFile, performanceSheets));
+    }
+
+    static SetlistProject createImportedProject(
+            File selectedFile, List<PerformanceSheet> performanceSheets) {
+        if (isXlsxFile(selectedFile)) {
+            return SetlistProjectFactory.fromImportedSheets(performanceSheets);
+        }
+        return SetlistProjectFactory.fromImportedPerformances(performanceSheets.stream()
+                .flatMap(sheet -> sheet.performances().stream())
+                .toList());
     }
 
     /** XLSXでは元シートが公演数を決めるため、シートをまたぐ配分設定を無効にします。 */
@@ -339,6 +380,7 @@ public class SetlistFrame extends JFrame {
         boolean sheetScoped = selectedFile != null && isXlsxFile(selectedFile);
         sessionSpinner.setEnabled(!sheetScoped);
         capacityField.setEnabled(!sheetScoped);
+        dataFileBox.setToolTipText(selectedFile == null ? null : selectedFile.getAbsolutePath());
 
         if (selectedFile == null) {
             return;
@@ -351,7 +393,7 @@ public class SetlistFrame extends JFrame {
         }
     }
 
-    private boolean isXlsxFile(File file) {
+    private static boolean isXlsxFile(File file) {
         return file.getName().toLowerCase(Locale.ROOT).endsWith(".xlsx");
     }
 

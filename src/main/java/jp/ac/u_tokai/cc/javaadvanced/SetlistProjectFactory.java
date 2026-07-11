@@ -63,7 +63,7 @@ public final class SetlistProjectFactory {
             }
             sessions.add(new SetlistSession(performanceSheet.name(), entries));
         }
-        return new SetlistProject(sessions);
+        return new SetlistProject(sessions, true);
     }
 
     /** GUIで手入力を始めるための空プロジェクトを作成します。 */

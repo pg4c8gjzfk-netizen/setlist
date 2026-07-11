@@ -1,10 +1,19 @@
 package jp.ac.u_tokai.cc.javaadvanced;
 
 import java.awt.BorderLayout;
+import java.awt.BasicStroke;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.event.KeyEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -40,7 +49,12 @@ public final class SetlistEditorFrame extends JFrame {
     private final List<SetlistEntryTableModel> tableModels;
     private final List<JTable> tables;
     private final Consumer<SetlistProject> projectChangedHandler;
+    private final JButton addSessionButton;
+    private final JButton removeSessionButton;
+    private final JButton moveToAnotherSessionButton;
+    private final JLabel boundaryStatusLabel;
     private boolean rebuilding;
+    private boolean sheetBoundariesLocked;
 
     public SetlistEditorFrame(SetlistProject project, Consumer<SetlistProject> projectChangedHandler) {
         super("香盤表を編集");
@@ -48,6 +62,12 @@ public final class SetlistEditorFrame extends JFrame {
         this.tableModels = new ArrayList<>();
         this.tables = new ArrayList<>();
         this.projectChangedHandler = Objects.requireNonNull(projectChangedHandler, "projectChangedHandler must not be null");
+        this.addSessionButton = AppTheme.quietButton("公演を追加");
+        this.removeSessionButton = AppTheme.quietButton("公演を削除");
+        this.moveToAnotherSessionButton = AppTheme.quietButton("別の公演へ");
+        this.boundaryStatusLabel = AppTheme.statusPill("シート境界を保持", new java.awt.Color(0x248A3D));
+        this.boundaryStatusLabel.setToolTipText("XLSXの各シートを独立した公演として保持します。");
+        this.boundaryStatusLabel.setVisible(false);
         setupWindow();
         setProject(Objects.requireNonNull(project, "project must not be null"));
     }
@@ -58,7 +78,7 @@ public final class SetlistEditorFrame extends JFrame {
         for (int index = 0; index < tableModels.size(); index++) {
             sessions.add(new SetlistSession(sessionTabs.getTitleAt(index), tableModels.get(index).entries()));
         }
-        return new SetlistProject(sessions);
+        return new SetlistProject(sessions, sheetBoundariesLocked);
     }
 
     private void setupWindow() {
@@ -66,6 +86,7 @@ public final class SetlistEditorFrame extends JFrame {
         setIconImage(AppIcon.create(64));
         JPanel root = AppTheme.page(new BorderLayout(0, 16));
         root.setBorder(AppTheme.pagePadding());
+        root.setFocusable(true);
         setContentPane(root);
 
         sessionTabs.putClientProperty(
@@ -81,6 +102,12 @@ public final class SetlistEditorFrame extends JFrame {
         AppTheme.bindMenuShortcut(getRootPane(), "save-project", KeyEvent.VK_S, this::saveProject);
         AppTheme.bindMenuShortcut(getRootPane(), "regenerate-project", KeyEvent.VK_R, this::regenerate);
         AppTheme.bindMenuShortcut(getRootPane(), "close-editor", KeyEvent.VK_W, this::dispose);
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowOpened(WindowEvent event) {
+                root.requestFocusInWindow();
+            }
+        });
 
         setMinimumSize(new Dimension(1000, 650));
         setSize(1180, 760);
@@ -107,6 +134,7 @@ public final class SetlistEditorFrame extends JFrame {
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
+        actions.add(boundaryStatusLabel);
         actions.add(closeButton);
         actions.add(saveButton);
         actions.add(regenerateButton);
@@ -119,14 +147,11 @@ public final class SetlistEditorFrame extends JFrame {
     private JPanel createActionPanel() {
         JPanel panel = AppTheme.card(new BorderLayout());
 
-        JButton addSessionButton = AppTheme.quietButton("公演を追加");
-        JButton removeSessionButton = AppTheme.quietButton("公演を削除");
         JButton moveUpButton = AppTheme.quietButton("上へ");
         JButton moveDownButton = AppTheme.quietButton("下へ");
         JButton moveFirstButton = AppTheme.quietButton("先頭へ");
         JButton moveLastButton = AppTheme.quietButton("末尾へ");
         JButton moveToPositionButton = AppTheme.quietButton("指定順へ");
-        JButton moveToAnotherSessionButton = AppTheme.quietButton("別の公演へ");
         JButton addEntryButton = AppTheme.quietButton("演目を追加");
         JButton removeEntryButton = AppTheme.quietButton("演目を削除");
         AppTheme.styleDanger(removeSessionButton);
@@ -193,6 +218,8 @@ public final class SetlistEditorFrame extends JFrame {
 
     private void setProject(SetlistProject project) {
         rebuilding = true;
+        sheetBoundariesLocked = project.sheetBoundariesLocked();
+        updateSheetBoundaryControls();
         sessionTabs.removeAll();
         tableModels.clear();
         tables.clear();
@@ -203,7 +230,30 @@ public final class SetlistEditorFrame extends JFrame {
         publishProject();
     }
 
+    private void updateSheetBoundaryControls() {
+        boolean canChangeSessions = !sheetBoundariesLocked;
+        addSessionButton.setEnabled(canChangeSessions);
+        removeSessionButton.setEnabled(canChangeSessions);
+        moveToAnotherSessionButton.setEnabled(canChangeSessions);
+        boundaryStatusLabel.setVisible(sheetBoundariesLocked);
+
+        if (sheetBoundariesLocked) {
+            String explanation = "XLSXでは元シートの追加・削除・公演間移動はできません。";
+            addSessionButton.setToolTipText(explanation);
+            removeSessionButton.setToolTipText(explanation);
+            moveToAnotherSessionButton.setToolTipText(explanation);
+        } else {
+            addSessionButton.setToolTipText("新しい公演タブを追加します。");
+            removeSessionButton.setToolTipText("選択中の公演タブを削除します。");
+            moveToAnotherSessionButton.setToolTipText("選択した演目を別の公演へ移動します。");
+        }
+    }
+
     private void addSession() {
+        if (sheetBoundariesLocked) {
+            showValidationError("XLSXのシート構成は変更できません。");
+            return;
+        }
         addSessionTab(nextSessionName(), List.of());
         sessionTabs.setSelectedIndex(sessionTabs.getTabCount() - 1);
         publishProject();
@@ -215,7 +265,7 @@ public final class SetlistEditorFrame extends JFrame {
         model.setChangedHandler(this::publishProject);
         model.setPerformerChangeCallbacks(this::choosePerformerChangeScope, this::updatePerformersInAllSessions);
 
-        JTable table = new JTable(model);
+        JTable table = new EmptyStateTable(model);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setAutoCreateRowSorter(false);
         AppTheme.styleTable(table);
@@ -227,6 +277,9 @@ public final class SetlistEditorFrame extends JFrame {
         table.getColumnModel().getColumn(3).setPreferredWidth(360);
         table.getColumnModel().getColumn(4).setPreferredWidth(72);
         table.getColumnModel().getColumn(4).setMaxWidth(86);
+        table.getAccessibleContext().setAccessibleName(name + "の演目一覧");
+        table.getAccessibleContext().setAccessibleDescription(
+                "演目がない場合は、画面下部の「演目を追加」から追加できます。");
         tableModels.add(model);
         tables.add(table);
         JScrollPane scrollPane = AppTheme.scroll(table);
@@ -337,6 +390,10 @@ public final class SetlistEditorFrame extends JFrame {
     }
 
     private void moveSelectedEntryToAnotherSession() {
+        if (sheetBoundariesLocked) {
+            showValidationError("XLSXの演目は元シート以外の公演へ移動できません。");
+            return;
+        }
         int sourceSessionIndex = sessionTabs.getSelectedIndex();
         if (sourceSessionIndex < 0) {
             showValidationError("公演タブを選択してください。");
@@ -380,6 +437,10 @@ public final class SetlistEditorFrame extends JFrame {
     }
 
     private void removeSelectedSession() {
+        if (sheetBoundariesLocked) {
+            showValidationError("XLSXのシート構成は変更できません。");
+            return;
+        }
         int selectedIndex = sessionTabs.getSelectedIndex();
         if (selectedIndex < 0) {
             return;
@@ -478,6 +539,67 @@ public final class SetlistEditorFrame extends JFrame {
 
     private void showValidationError(String message) {
         JOptionPane.showMessageDialog(this, message, "入力エラー", JOptionPane.ERROR_MESSAGE);
+    }
+
+    /** 演目がない場合にも、次の操作を画面内で案内する表です。 */
+    private static final class EmptyStateTable extends JTable {
+
+        private static final long serialVersionUID = 1L;
+
+        private EmptyStateTable(SetlistEntryTableModel model) {
+            super(model);
+        }
+
+        @Override
+        protected void paintComponent(Graphics graphics) {
+            super.paintComponent(graphics);
+            if (getRowCount() != 0) {
+                return;
+            }
+
+            Rectangle visibleArea = getVisibleRect();
+            if (visibleArea.width < 200 || visibleArea.height < 120) {
+                return;
+            }
+
+            Graphics2D graphics2D = (Graphics2D) graphics.create();
+            try {
+                graphics2D.setRenderingHint(
+                        RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                graphics2D.setRenderingHint(
+                        RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+                int centerX = visibleArea.x + visibleArea.width / 2;
+                int centerY = visibleArea.y + visibleArea.height / 2 - 12;
+                int iconSize = 38;
+                int iconX = centerX - iconSize / 2;
+                int iconY = centerY - 62;
+
+                graphics2D.setColor(AppTheme.SURFACE_SUBTLE);
+                graphics2D.fillOval(iconX, iconY, iconSize, iconSize);
+                graphics2D.setColor(AppTheme.BORDER);
+                graphics2D.drawOval(iconX, iconY, iconSize, iconSize);
+                graphics2D.setColor(AppTheme.ACCENT);
+                graphics2D.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                graphics2D.drawLine(centerX - 7, iconY + iconSize / 2, centerX + 7, iconY + iconSize / 2);
+                graphics2D.drawLine(centerX, iconY + iconSize / 2 - 7, centerX, iconY + iconSize / 2 + 7);
+
+                graphics2D.setColor(AppTheme.TEXT_PRIMARY);
+                graphics2D.setFont(getFont().deriveFont(Font.BOLD, 16f));
+                drawCentered(graphics2D, "演目がありません", centerX, centerY + 4);
+
+                graphics2D.setColor(AppTheme.TEXT_SECONDARY);
+                graphics2D.setFont(getFont().deriveFont(Font.PLAIN, 13f));
+                drawCentered(graphics2D, "下の「演目を追加」から始められます。", centerX, centerY + 28);
+            } finally {
+                graphics2D.dispose();
+            }
+        }
+
+        private static void drawCentered(Graphics2D graphics, String text, int centerX, int baseline) {
+            FontMetrics metrics = graphics.getFontMetrics();
+            graphics.drawString(text, centerX - metrics.stringWidth(text) / 2, baseline);
+        }
     }
 
     private record SessionTarget(int sessionIndex, String sessionName) {
