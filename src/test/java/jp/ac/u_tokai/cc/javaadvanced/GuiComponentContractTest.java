@@ -67,7 +67,7 @@ public class GuiComponentContractTest {
     }
 
     @Test
-    public void editorUsesCheckboxBasedFixedColumnAndShowsMoveControls() throws Exception {
+    public void editorShowsPerformerParticipationAsSeparateCircleColumns() throws Exception {
         Assume.assumeFalse("画面表示できない環境ではSwing契約テストを実行しません。", GraphicsEnvironment.isHeadless());
         runOnEventDispatchThread(() -> {
             SetlistEditorFrame frame = new SetlistEditorFrame(projectWithOneEntry(), project -> {
@@ -76,8 +76,26 @@ public class GuiComponentContractTest {
                 frame.setVisible(true);
                 JTable table = findComponent(frame.getContentPane(), JTable.class);
                 assertNotNull(table);
-                assertEquals(5, table.getColumnCount());
-                assertEquals("固定", table.getColumnName(4));
+                assertEquals(6, table.getColumnCount());
+                assertEquals("出演者A", table.getColumnName(3));
+                assertEquals("出演者B", table.getColumnName(4));
+                assertEquals("固定", table.getColumnName(5));
+                assertFalse(hasColumnNamed(table, "出演者"));
+                assertEquals(Boolean.TRUE, table.getValueAt(0, 3));
+                assertEquals(Boolean.FALSE, table.getValueAt(0, 4));
+                Component markedCell = table.getCellRenderer(0, 3)
+                        .getTableCellRendererComponent(table, Boolean.TRUE, false, false, 0, 3);
+                Component emptyCell = table.getCellRenderer(0, 4)
+                        .getTableCellRendererComponent(table, Boolean.FALSE, false, false, 0, 4);
+                assertEquals("◯", ((JLabel) markedCell).getText());
+                assertEquals("", ((JLabel) emptyCell).getText());
+                Component editingCell = table.getColumnModel().getColumn(4).getCellEditor()
+                        .getTableCellEditorComponent(table, Boolean.FALSE, true, 0, 4);
+                assertEquals("◯", ((JLabel) editingCell).getText());
+                assertEquals(Boolean.TRUE,
+                        table.getColumnModel().getColumn(4).getCellEditor().getCellEditorValue());
+                assertNotNull(findButton(frame.getContentPane(), "演者を追加"));
+                assertNotNull(findButton(frame.getContentPane(), "演者を削除"));
                 assertNotNull(findButton(frame.getContentPane(), "先頭へ"));
                 assertNotNull(findButton(frame.getContentPane(), "末尾へ"));
                 assertNotNull(findButton(frame.getContentPane(), "指定順へ"));
@@ -123,8 +141,18 @@ public class GuiComponentContractTest {
     private SetlistProject projectWithOneEntry() {
         SetlistEntry entry = new SetlistEntry(
                 UUID.randomUUID(), UUID.randomUUID(), "確認用演目", 180,
-                List.of("出演者"), false, FixedPosition.NONE, -1);
-        return new SetlistProject(List.of(new SetlistSession("第1公演", List.of(entry))));
+                List.of("出演者A"), false, FixedPosition.NONE, -1);
+        return new SetlistProject(List.of(new SetlistSession(
+                "第1公演", List.of(entry), List.of("出演者A", "出演者B"))));
+    }
+
+    private boolean hasColumnNamed(JTable table, String columnName) {
+        for (int column = 0; column < table.getColumnCount(); column++) {
+            if (columnName.equals(table.getColumnName(column))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private JButton findButton(Container root, String text) {

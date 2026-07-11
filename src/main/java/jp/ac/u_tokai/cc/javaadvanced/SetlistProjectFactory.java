@@ -23,7 +23,8 @@ public final class SetlistProjectFactory {
             for (Performance performance : performanceSheet.performances()) {
                 entries.add(SetlistEntry.fromPerformance(UUID.randomUUID(), performance));
             }
-            sessions.add(new SetlistSession(performanceSheet.name(), entries));
+            sessions.add(new SetlistSession(
+                    performanceSheet.name(), entries, performanceSheet.performerNames()));
         }
         return new SetlistProject(sessions, true);
     }

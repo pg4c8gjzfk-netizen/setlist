@@ -56,6 +56,34 @@ public class XlsxPerformanceReaderSheetBoundaryTest {
         assertEquals(List.of("同名曲", "同名曲"), titles(sheets.getFirst()));
     }
 
+    @Test
+    public void performerHeadersKeepTheirOriginalColumnOrder() throws Exception {
+        File workbookFile = temporaryFolder.newFile("performer-order.xlsx");
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("第1公演");
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("曲名");
+            header.createCell(1).setCellValue("時間");
+            header.createCell(2).setCellValue("出演者A");
+            header.createCell(3).setCellValue("出演者B");
+            header.createCell(4).setCellValue("出演者C");
+            header.createCell(5).setCellValue("人数");
+            Row performance = sheet.createRow(1);
+            performance.createCell(0).setCellValue("順序確認曲");
+            performance.createCell(1).setCellValue("3:00");
+            performance.createCell(2).setCellValue("◯");
+            performance.createCell(4).setCellValue("◯");
+            try (FileOutputStream output = new FileOutputStream(workbookFile)) {
+                workbook.write(output);
+            }
+        }
+
+        PerformanceSheet sheet = new XlsxPerformanceReader().loadSheets(workbookFile).getFirst();
+
+        assertEquals(List.of("出演者A", "出演者B", "出演者C"), sheet.performerNames());
+        assertEquals(List.of("出演者A", "出演者C"), sheet.performances().getFirst().getPerformers());
+    }
+
     private Sheet addPerformanceSheet(
             Workbook workbook, String sheetName, String title, String performer) {
         Sheet sheet = workbook.createSheet(sheetName);

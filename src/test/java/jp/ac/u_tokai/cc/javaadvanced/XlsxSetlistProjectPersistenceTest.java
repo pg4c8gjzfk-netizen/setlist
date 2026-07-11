@@ -20,8 +20,9 @@ public class XlsxSetlistProjectPersistenceTest {
         SetlistEntry substitute = entry("代理出演曲", List.of("代理出演者"), false, FixedPosition.NONE, -1);
         SetlistEntry indexed = entry("位置固定曲", List.of("出演者B"), true, FixedPosition.INDEX, 1);
         SetlistProject project = new SetlistProject(List.of(
-                new SetlistSession("第1公演", List.of(opening, indexed)),
-                new SetlistSession("第2公演", List.of(substitute))));
+                new SetlistSession(
+                        "第1公演", List.of(opening, indexed), List.of("出演者A", "出演者B", "控え")),
+                new SetlistSession("第2公演", List.of(substitute), List.of("代理出演者"))));
         File output = Files.createTempFile("setlist-project-", ".xlsx").toFile();
 
         new XlsxSetlistProjectWriter().write(project, output);
@@ -44,7 +45,8 @@ public class XlsxSetlistProjectPersistenceTest {
 
     @Test
     public void emptySessionCanBeSavedAndRestored() throws Exception {
-        SetlistProject project = new SetlistProject(List.of(new SetlistSession("空の公演", List.of())));
+        SetlistProject project = new SetlistProject(List.of(new SetlistSession(
+                "空の公演", List.of(), List.of("出演予定者"))));
         File output = Files.createTempFile("empty-setlist-project-", ".xlsx").toFile();
 
         new XlsxSetlistProjectWriter().write(project, output);

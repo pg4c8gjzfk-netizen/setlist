@@ -3,7 +3,7 @@ package jp.ac.u_tokai.cc.javaadvanced;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -42,9 +42,10 @@ public class XlsxPerformanceReader {
                     System.out.println("   シート「" + sheetName + "」はスキップします。");
                     continue;
                 }
-                List<Performance> sheetPerformances = loadSheet(sheet);
-                if (!sheetPerformances.isEmpty()) {
-                    performanceSheets.add(new PerformanceSheet(sheetName, sheetPerformances));
+                LoadedSheet loadedSheet = loadSheet(sheet);
+                if (!loadedSheet.performances().isEmpty()) {
+                    performanceSheets.add(new PerformanceSheet(
+                            sheetName, loadedSheet.performances(), loadedSheet.performerNames()));
                 }
             }
         } catch (Exception e) {
@@ -58,7 +59,7 @@ public class XlsxPerformanceReader {
     /**
      * 1シート分の演目データを読み込みます。
      */
-    private List<Performance> loadSheet(Sheet sheet) {
+    private LoadedSheet loadSheet(Sheet sheet) {
         String sheetName = sheet.getSheetName();
         List<Performance> performances = new ArrayList<>();
 
@@ -67,7 +68,7 @@ public class XlsxPerformanceReader {
         Row headerRow = sheet.getRow(0);
         if (headerRow == null) {
             System.out.println("[デバッグ] シート「" + sheetName + "」の1行目が存在しないためスキップします。");
-            return performances;
+            return new LoadedSheet(List.of(), List.of());
         }
 
         Map<Integer, String> performerNameMap = readPerformerNames(headerRow, formatter);
@@ -90,7 +91,9 @@ public class XlsxPerformanceReader {
                 System.out.println("[デバッグ] " + (rowIndex + 1) + "行目の「" + title + "」をスキップしました。時間欄: " + durationText);
             }
         }
-        return List.copyOf(performances);
+        return new LoadedSheet(
+                List.copyOf(performances),
+                List.copyOf(performerNameMap.values()));
     }
 
     /**
@@ -104,7 +107,7 @@ public class XlsxPerformanceReader {
      * ヘッダー行から出演者名と列番号の対応を読み取ります。
      */
     private Map<Integer, String> readPerformerNames(Row headerRow, DataFormatter formatter) {
-        Map<Integer, String> performerNameMap = new HashMap<>();
+        Map<Integer, String> performerNameMap = new LinkedHashMap<>();
         int lastPerformerColumn = headerRow.getLastCellNum() - 1;
         for (int columnIndex = FIRST_PERFORMER_COLUMN; columnIndex < lastPerformerColumn; columnIndex++) {
             String name = formatter.formatCellValue(headerRow.getCell(columnIndex)).trim();
@@ -165,6 +168,9 @@ public class XlsxPerformanceReader {
             return (minutes * 60) + seconds;
         }
         return Integer.parseInt(cleanTime);
+    }
+
+    private record LoadedSheet(List<Performance> performances, List<String> performerNames) {
     }
 
 }

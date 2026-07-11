@@ -115,7 +115,7 @@ public final class SetlistRegenerator {
             slots.set(targetIndex, entry);
         }
 
-        return new SessionLayout(session.name(), slots);
+        return new SessionLayout(session.name(), session.performerNames(), slots);
     }
 
     private int determineFixedIndex(
@@ -185,7 +185,7 @@ public final class SetlistRegenerator {
                     entries.set(index, movableEntries.get(movableIndex++));
                 }
             }
-            sessions.add(new SetlistSession(layout.name(), entries));
+            sessions.add(new SetlistSession(layout.name(), entries, layout.performerNames()));
         }
         if (movableIndex != movableEntries.size()) {
             throw new IllegalArgumentException("未配置の演目があります。");
@@ -248,7 +248,8 @@ public final class SetlistRegenerator {
         return false;
     }
 
-    private record SessionLayout(String name, List<SetlistEntry> slots) {
+    private record SessionLayout(
+            String name, List<String> performerNames, List<SetlistEntry> slots) {
 
         private SessionLayout {
             // 空きスロットを null で表現するため、null を許可しない List.copyOf は使わない。

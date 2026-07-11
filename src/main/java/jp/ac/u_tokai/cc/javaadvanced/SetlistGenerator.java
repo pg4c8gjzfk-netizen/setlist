@@ -36,7 +36,8 @@ public class SetlistGenerator {
         for (PerformanceSheet sourceSheet : sourceSheets) {
             List<Performance> generatedOrder = optimizeOrder(
                     new ArrayList<>(sourceSheet.performances()), openerTitle, closerTitle);
-            generatedSheets.add(new PerformanceSheet(sourceSheet.name(), generatedOrder));
+            generatedSheets.add(new PerformanceSheet(
+                    sourceSheet.name(), generatedOrder, sourceSheet.performerNames()));
         }
 
         verifySheetMembershipPreserved(sourceSheets, generatedSheets);

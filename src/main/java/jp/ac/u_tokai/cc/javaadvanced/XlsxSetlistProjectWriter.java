@@ -30,6 +30,7 @@ public final class XlsxSetlistProjectWriter {
     static final int FIXED_COLUMN = 8;
     static final int FIXED_POSITION_COLUMN = 9;
     static final int FIXED_INDEX_COLUMN = 10;
+    static final int META_PERFORMER_LIST_START_COLUMN = 8;
 
     /**
      * プロジェクトを指定ファイルへ保存します。
@@ -78,7 +79,6 @@ public final class XlsxSetlistProjectWriter {
             cell.setCellValue(headers[column]);
             cell.setCellStyle(headerStyle);
         }
-
         for (int entryIndex = 0; entryIndex < session.entries().size(); entryIndex++) {
             SetlistEntry entry = session.entries().get(entryIndex);
             Row row = sheet.createRow(entryIndex + 1);
@@ -123,6 +123,9 @@ public final class XlsxSetlistProjectWriter {
             cell.setCellValue(headers[column]);
             cell.setCellStyle(headerStyle);
         }
+        Cell performerHeader = header.createCell(META_PERFORMER_LIST_START_COLUMN);
+        performerHeader.setCellValue("演者一覧（右方向）");
+        performerHeader.setCellStyle(headerStyle);
 
         int rowIndex = 3;
         for (int sessionIndex = 0; sessionIndex < project.sessions().size(); sessionIndex++) {
@@ -131,6 +134,10 @@ public final class XlsxSetlistProjectWriter {
             sessionRow.createCell(0).setCellValue(sessionIndex);
             sessionRow.createCell(1).setCellValue(session.name());
             sessionRow.createCell(2).setCellValue(-1);
+            for (int performerIndex = 0; performerIndex < session.performerNames().size(); performerIndex++) {
+                sessionRow.createCell(META_PERFORMER_LIST_START_COLUMN + performerIndex)
+                        .setCellValue(session.performerNames().get(performerIndex));
+            }
             for (int entryIndex = 0; entryIndex < session.entries().size(); entryIndex++) {
                 SetlistEntry entry = session.entries().get(entryIndex);
                 Row row = metadata.createRow(rowIndex++);

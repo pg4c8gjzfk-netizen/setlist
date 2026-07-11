@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+import javax.swing.AbstractCellEditor;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -38,7 +39,12 @@ import javax.swing.JTable;
 import javax.swing.JTabbedPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.event.TableModelEvent;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableCellEditor;
+import javax.swing.table.TableColumn;
 
 /** 公演ごとの演目を直接編集し、再生成できる画面です。 */
 public final class SetlistEditorFrame extends JFrame {
@@ -76,7 +82,9 @@ public final class SetlistEditorFrame extends JFrame {
     public SetlistProject currentProject() {
         List<SetlistSession> sessions = new ArrayList<>();
         for (int index = 0; index < tableModels.size(); index++) {
-            sessions.add(new SetlistSession(sessionTabs.getTitleAt(index), tableModels.get(index).entries()));
+            SetlistEntryTableModel model = tableModels.get(index);
+            sessions.add(new SetlistSession(
+                    sessionTabs.getTitleAt(index), model.entries(), model.performerNames()));
         }
         return new SetlistProject(sessions, sheetBoundariesLocked);
     }
@@ -95,6 +103,7 @@ public final class SetlistEditorFrame extends JFrame {
 
         root.add(createHeaderPanel(), BorderLayout.NORTH);
         JPanel editorCard = AppTheme.card(new BorderLayout());
+        editorCard.add(createPerformerPanel(), BorderLayout.NORTH);
         editorCard.add(sessionTabs, BorderLayout.CENTER);
         root.add(editorCard, BorderLayout.CENTER);
         root.add(createActionPanel(), BorderLayout.SOUTH);
@@ -184,6 +193,32 @@ public final class SetlistEditorFrame extends JFrame {
         return panel;
     }
 
+    private JPanel createPerformerPanel() {
+        JPanel panel = new JPanel(new BorderLayout(16, 0));
+        panel.setOpaque(false);
+        panel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+
+        JPanel explanation = transparentBoxPanel(BoxLayout.Y_AXIS);
+        explanation.add(AppTheme.fieldLabel("演者別の出演欄"));
+        explanation.add(Box.createVerticalStrut(4));
+        explanation.add(AppTheme.body("出演する演目のセルを選ぶと◯が付き、空欄は出演なしを表します。"));
+
+        JButton addPerformerButton = AppTheme.quietButton("演者を追加");
+        JButton removePerformerButton = AppTheme.quietButton("演者を削除");
+        AppTheme.styleDanger(removePerformerButton);
+        addPerformerButton.addActionListener(event -> addPerformer());
+        removePerformerButton.addActionListener(event -> removePerformer());
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        actions.setOpaque(false);
+        actions.add(addPerformerButton);
+        actions.add(removePerformerButton);
+
+        panel.add(explanation, BorderLayout.WEST);
+        panel.add(actions, BorderLayout.EAST);
+        return panel;
+    }
+
     private JPanel createToolbarGroup(String title, JButton... buttons) {
         JPanel group = transparentBoxPanel(BoxLayout.Y_AXIS);
         JLabel label = AppTheme.fieldLabel(title);
@@ -224,7 +259,7 @@ public final class SetlistEditorFrame extends JFrame {
         tableModels.clear();
         tables.clear();
         for (SetlistSession session : project.sessions()) {
-            addSessionTab(session.name(), session.entries());
+            addSessionTab(session.name(), session.entries(), session.performerNames());
         }
         rebuilding = false;
         publishProject();
@@ -254,13 +289,14 @@ public final class SetlistEditorFrame extends JFrame {
             showValidationError("XLSXのシート構成は変更できません。");
             return;
         }
-        addSessionTab(nextSessionName(), List.of());
+        addSessionTab(nextSessionName(), List.of(), List.of());
         sessionTabs.setSelectedIndex(sessionTabs.getTabCount() - 1);
         publishProject();
     }
 
-    private void addSessionTab(String name, List<SetlistEntry> entries) {
-        SetlistEntryTableModel model = new SetlistEntryTableModel(entries);
+    private void addSessionTab(
+            String name, List<SetlistEntry> entries, List<String> performerNames) {
+        SetlistEntryTableModel model = new SetlistEntryTableModel(entries, performerNames);
         model.setValidationErrorHandler(this::showValidationError);
         model.setChangedHandler(this::publishProject);
         model.setPerformerChangeCallbacks(this::choosePerformerChangeScope, this::updatePerformersInAllSessions);
@@ -269,17 +305,15 @@ public final class SetlistEditorFrame extends JFrame {
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setAutoCreateRowSorter(false);
         AppTheme.styleTable(table);
-        table.getColumnModel().getColumn(0).setPreferredWidth(60);
-        table.getColumnModel().getColumn(0).setMaxWidth(76);
-        table.getColumnModel().getColumn(1).setPreferredWidth(280);
-        table.getColumnModel().getColumn(2).setPreferredWidth(100);
-        table.getColumnModel().getColumn(2).setMaxWidth(130);
-        table.getColumnModel().getColumn(3).setPreferredWidth(360);
-        table.getColumnModel().getColumn(4).setPreferredWidth(72);
-        table.getColumnModel().getColumn(4).setMaxWidth(86);
+        configureTableColumns(table, model);
+        model.addTableModelListener(event -> {
+            if (event.getFirstRow() == TableModelEvent.HEADER_ROW) {
+                SwingUtilities.invokeLater(() -> configureTableColumns(table, model));
+            }
+        });
         table.getAccessibleContext().setAccessibleName(name + "の演目一覧");
         table.getAccessibleContext().setAccessibleDescription(
-                "演目がない場合は、画面下部の「演目を追加」から追加できます。");
+                "演者ごとの列では、◯が出演、空欄が出演なしを表します。");
         tableModels.add(model);
         tables.add(table);
         JScrollPane scrollPane = AppTheme.scroll(table);
@@ -287,8 +321,44 @@ public final class SetlistEditorFrame extends JFrame {
         sessionTabs.addTab(name, scrollPane);
     }
 
+    private void configureTableColumns(JTable table, SetlistEntryTableModel model) {
+        if (table.getColumnCount() != model.getColumnCount()) {
+            return;
+        }
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        table.getTableHeader().setReorderingAllowed(false);
+
+        TableColumn orderColumn = table.getColumnModel().getColumn(0);
+        orderColumn.setPreferredWidth(60);
+        orderColumn.setMaxWidth(76);
+        table.getColumnModel().getColumn(1).setPreferredWidth(280);
+        TableColumn durationColumn = table.getColumnModel().getColumn(2);
+        durationColumn.setPreferredWidth(100);
+        durationColumn.setMaxWidth(130);
+
+        for (String performerName : model.performerNames()) {
+            int columnIndex = model.performerColumnIndex(performerName);
+            TableColumn performerColumn = table.getColumnModel().getColumn(columnIndex);
+            performerColumn.setMinWidth(72);
+            performerColumn.setPreferredWidth(Math.min(132, Math.max(82, performerName.length() * 18)));
+            performerColumn.setCellRenderer(new ParticipationMarkRenderer());
+            performerColumn.setCellEditor(new ParticipationMarkEditor());
+        }
+
+        TableColumn fixedColumn = table.getColumnModel().getColumn(model.fixedColumnIndex());
+        fixedColumn.setPreferredWidth(72);
+        fixedColumn.setMaxWidth(86);
+    }
+
     private SetlistEntryTableModel.PerformerChangeScope choosePerformerChangeScope(
             SetlistEntryTableModel.PerformerEditRequest request) {
+        long matchingEntries = tableModels.stream()
+                .flatMap(model -> model.entries().stream())
+                .filter(entry -> entry.sourcePerformanceId().equals(request.entry().sourcePerformanceId()))
+                .count();
+        if (matchingEntries <= 1) {
+            return SetlistEntryTableModel.PerformerChangeScope.CURRENT_SESSION;
+        }
         Object[] options = {"この公演だけ変更", "同じ演目を全公演変更", "キャンセル"};
         int choice = JOptionPane.showOptionDialog(
                 this,
@@ -314,6 +384,46 @@ public final class SetlistEditorFrame extends JFrame {
 
     private void addEntry() {
         selectedModel().ifPresent(SetlistEntryTableModel::addEntry);
+    }
+
+    private void addPerformer() {
+        selectedModel().ifPresent(model -> {
+            String performerName = JOptionPane.showInputDialog(
+                    this, "追加する演者名を入力してください。", "演者を追加", JOptionPane.PLAIN_MESSAGE);
+            if (performerName == null) {
+                return;
+            }
+            try {
+                model.addPerformer(performerName);
+            } catch (IllegalArgumentException exception) {
+                showValidationError(exception.getMessage());
+            }
+        });
+    }
+
+    private void removePerformer() {
+        selectedModel().ifPresent(model -> {
+            if (model.performerNames().isEmpty()) {
+                showValidationError("削除できる演者がいません。");
+                return;
+            }
+            String performerName = (String) JOptionPane.showInputDialog(
+                    this,
+                    "削除する演者を選んでください。出演中の演者は削除できません。",
+                    "演者を削除",
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    model.performerNames().toArray(),
+                    model.performerNames().getFirst());
+            if (performerName == null) {
+                return;
+            }
+            try {
+                model.removePerformer(performerName);
+            } catch (IllegalArgumentException exception) {
+                showValidationError(exception.getMessage());
+            }
+        });
     }
 
     private void removeSelectedEntry() {
@@ -599,6 +709,64 @@ public final class SetlistEditorFrame extends JFrame {
         private static void drawCentered(Graphics2D graphics, String text, int centerX, int baseline) {
             FontMetrics metrics = graphics.getFontMetrics();
             graphics.drawString(text, centerX - metrics.stringWidth(text) / 2, baseline);
+        }
+    }
+
+    /** 出演状態をExcelと同じ◯／空欄で表示します。 */
+    private static final class ParticipationMarkRenderer extends DefaultTableCellRenderer {
+
+        private static final long serialVersionUID = 1L;
+
+        private ParticipationMarkRenderer() {
+            setHorizontalAlignment(SwingConstants.CENTER);
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(
+                JTable table,
+                Object value,
+                boolean isSelected,
+                boolean hasFocus,
+                int row,
+                int column) {
+            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            setText(Boolean.TRUE.equals(value) ? "◯" : "");
+            setFont(getFont().deriveFont(Font.BOLD, 16f));
+            return this;
+        }
+    }
+
+    /** クリック時も標準チェック記号を出さず、◯／空欄だけで状態を切り替えます。 */
+    private static final class ParticipationMarkEditor extends AbstractCellEditor implements TableCellEditor {
+
+        private static final long serialVersionUID = 1L;
+        private final JLabel editorLabel;
+        private boolean editedValue;
+
+        private ParticipationMarkEditor() {
+            editorLabel = new JLabel("", SwingConstants.CENTER);
+            editorLabel.setOpaque(true);
+        }
+
+        @Override
+        public Object getCellEditorValue() {
+            return editedValue;
+        }
+
+        @Override
+        public Component getTableCellEditorComponent(
+                JTable table,
+                Object value,
+                boolean isSelected,
+                int row,
+                int column) {
+            editedValue = !Boolean.TRUE.equals(value);
+            editorLabel.setText(editedValue ? "◯" : "");
+            editorLabel.setFont(table.getFont().deriveFont(Font.BOLD, 16f));
+            editorLabel.setBackground(table.getSelectionBackground());
+            editorLabel.setForeground(table.getSelectionForeground());
+            SwingUtilities.invokeLater(this::stopCellEditing);
+            return editorLabel;
         }
     }
 

@@ -51,6 +51,7 @@ public final class XlsxSetlistProjectReader {
     private MetadataContent readMetadata(Sheet metadata) {
         List<MetadataRow> rows = new ArrayList<>();
         Map<Integer, String> sessionNames = new HashMap<>();
+        Map<Integer, List<String>> performerNamesBySession = new HashMap<>();
         for (int rowIndex = 3; rowIndex <= metadata.getLastRowNum(); rowIndex++) {
             Row row = metadata.getRow(rowIndex);
             if (row == null || cellText(row, 0).isBlank()) {
@@ -65,6 +66,8 @@ public final class XlsxSetlistProjectReader {
                     throw new IllegalArgumentException("_setlist_meta シートの公演名が一致しません。");
                 }
                 if (entryIndex == -1) {
+                    performerNamesBySession.put(
+                            sessionIndex, readPerformerNames(row));
                     continue;
                 }
                 rows.add(new MetadataRow(
@@ -80,7 +83,7 @@ public final class XlsxSetlistProjectReader {
                 throw new IllegalArgumentException("_setlist_meta シートの " + (rowIndex + 1) + " 行目が不正です。", exception);
             }
         }
-        return new MetadataContent(sessionNames, rows);
+        return new MetadataContent(sessionNames, rows, performerNamesBySession);
     }
 
     private SetlistProject readProjectFromDisplaySheets(Workbook workbook, MetadataContent metadataContent) {
@@ -105,7 +108,11 @@ public final class XlsxSetlistProjectReader {
                     .sorted(Comparator.comparingInt(MetadataRow::entryIndex))
                     .forEach(metadata -> entries.add(readEntry(sheet, metadata)));
             String sessionName = metadataContent.sessionNames().get(displaySessionIndex);
-            sessions.add(new SetlistSession(sessionName, entries));
+            sessions.add(new SetlistSession(
+                    sessionName,
+                    entries,
+                    metadataContent.performerNamesBySession()
+                            .getOrDefault(displaySessionIndex, List.of())));
             displaySessionIndex++;
         }
 
@@ -186,6 +193,19 @@ public final class XlsxSetlistProjectReader {
         throw new IllegalArgumentException("固定状態が不正です。");
     }
 
+    private List<String> readPerformerNames(Row sessionRow) {
+        List<String> performerNames = new ArrayList<>();
+        for (int column = XlsxSetlistProjectWriter.META_PERFORMER_LIST_START_COLUMN;
+                column < sessionRow.getLastCellNum();
+                column++) {
+            String performerName = cellText(sessionRow, column);
+            if (!performerName.isBlank()) {
+                performerNames.add(performerName);
+            }
+        }
+        return List.copyOf(performerNames);
+    }
+
     private String cellText(Row row, int column) {
         if (row == null) {
             return "";
@@ -205,6 +225,9 @@ public final class XlsxSetlistProjectReader {
             int fixedIndex) {
     }
 
-    private record MetadataContent(Map<Integer, String> sessionNames, List<MetadataRow> rows) {
+    private record MetadataContent(
+            Map<Integer, String> sessionNames,
+            List<MetadataRow> rows,
+            Map<Integer, List<String>> performerNamesBySession) {
     }
 }
