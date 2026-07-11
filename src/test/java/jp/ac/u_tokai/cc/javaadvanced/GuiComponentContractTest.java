@@ -12,10 +12,12 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -48,6 +50,7 @@ public class GuiComponentContractTest {
                 assertEquals("Setlist Studio", frame.getTitle());
                 JButton editButton = findButton(frame.getContentPane(), "編集");
                 JButton startEditingButton = findButton(frame.getContentPane(), "編集を開始");
+                JButton saveButton = findButton(frame.getContentPane(), "編集状態を保存");
                 JButton exportButton = findButton(frame.getContentPane(), "配布用XLSX出力");
                 assertNotNull(editButton);
                 assertNotNull(startEditingButton);
@@ -57,16 +60,66 @@ public class GuiComponentContractTest {
                         candidate -> "XLSXファイル".equals(candidate.getText())));
                 assertNull(findComponent(frame.getContentPane(), JTextField.class));
                 assertFalse(editButton.isEnabled());
+                assertFalse(saveButton.isEnabled());
                 assertFalse(exportButton.isEnabled());
+                assertEquals(JFrame.DO_NOTHING_ON_CLOSE, frame.getDefaultCloseOperation());
+                assertNotNull(findComponent(
+                        frame.getContentPane(), JLabel.class,
+                        candidate -> "未作成".equals(candidate.getText())));
                 assertNotNull(startEditingButton.getClientProperty(
                         com.formdev.flatlaf.FlatClientProperties.STYLE));
                 assertShortcut(frame, KeyEvent.VK_N, "new-project");
                 assertShortcut(frame, KeyEvent.VK_O, "open-project");
+                assertShortcut(frame, KeyEvent.VK_S, "save-project");
 
                 frame.displayGeneratedProject(projectWithOneEntry());
 
                 assertTrue(editButton.isEnabled());
+                assertTrue(saveButton.isEnabled());
                 assertTrue(exportButton.isEnabled());
+                assertTrue(frame.hasUnsavedChanges());
+                assertEquals("Setlist Studio *", frame.getTitle());
+                assertNotNull(findComponent(
+                        frame.getContentPane(), JLabel.class,
+                        candidate -> "未保存の変更".equals(candidate.getText())));
+            } finally {
+                frame.dispose();
+            }
+        });
+    }
+
+    @Test
+    public void mainFrameGuardsUnsavedChangesAndClearsDirtyStateAfterEditableSave() throws Exception {
+        Assume.assumeFalse("画面表示できない環境ではSwing契約テストを実行しません。", GraphicsEnvironment.isHeadless());
+        AtomicReference<UnsavedChangesPrompt.Decision> decision =
+                new AtomicReference<>(UnsavedChangesPrompt.Decision.CANCEL);
+        AtomicInteger promptCount = new AtomicInteger();
+        runOnEventDispatchThread(() -> {
+            SetlistFrame frame = new SetlistFrame((parent, actionName) -> {
+                assertEquals("新しい香盤表を作成する", actionName);
+                promptCount.incrementAndGet();
+                return decision.get();
+            });
+            File output = Files.createTempFile("saved-editable-setlist-", ".xlsx").toFile();
+            output.deleteOnExit();
+            try {
+                frame.displayGeneratedProject(projectWithOneEntry());
+
+                assertFalse(frame.confirmProjectReplacement("新しい香盤表を作成する"));
+                assertTrue(frame.hasUnsavedChanges());
+                decision.set(UnsavedChangesPrompt.Decision.DISCARD);
+                assertTrue(frame.confirmProjectReplacement("新しい香盤表を作成する"));
+                assertEquals(2, promptCount.get());
+
+                frame.writeEditableProject(output);
+
+                assertFalse(frame.hasUnsavedChanges());
+                assertEquals("Setlist Studio", frame.getTitle());
+                assertNotNull(findComponent(
+                        frame.getContentPane(), JLabel.class,
+                        candidate -> "保存済み".equals(candidate.getText())));
+                assertTrue(frame.confirmProjectReplacement("新しい香盤表を作成する"));
+                assertEquals("保存済み状態では確認を表示しません。", 2, promptCount.get());
             } finally {
                 frame.dispose();
             }
@@ -99,11 +152,20 @@ public class GuiComponentContractTest {
     @Test
     public void editorShowsPerformerParticipationAsSeparateCircleColumns() throws Exception {
         Assume.assumeFalse("画面表示できない環境ではSwing契約テストを実行しません。", GraphicsEnvironment.isHeadless());
+        AtomicReference<SetlistProject> changedProject = new AtomicReference<>();
         runOnEventDispatchThread(() -> {
-            SetlistEditorFrame frame = new SetlistEditorFrame(projectWithOneEntry(), project -> {
-            });
+            SetlistEditorFrame frame = new SetlistEditorFrame(projectWithOneEntry(), changedProject::set);
+            File output = Files.createTempFile("editor-save-state-", ".xlsx").toFile();
+            output.deleteOnExit();
             try {
                 frame.setVisible(true);
+                assertEquals(JFrame.DO_NOTHING_ON_CLOSE, frame.getDefaultCloseOperation());
+                assertNull("画面を開いただけでは変更扱いにしません。", changedProject.get());
+                assertFalse(frame.hasUnsavedChanges());
+                JLabel saveStatus = findComponent(
+                        frame.getContentPane(), JLabel.class,
+                        candidate -> "変更なし".equals(candidate.getText()));
+                assertNotNull(saveStatus);
                 JTable table = findComponent(frame.getContentPane(), JTable.class);
                 assertNotNull(table);
                 assertEquals(6, table.getColumnCount());
@@ -137,6 +199,18 @@ public class GuiComponentContractTest {
                 for (String buttonText : List.of("演目を削除", "再生成", "XLSX保存", "閉じる")) {
                     assertButtonFullyVisible(frame, buttonText);
                 }
+
+                table.setValueAt("変更後の演目", 0, 1);
+                assertTrue(frame.hasUnsavedChanges());
+                assertNotNull(changedProject.get());
+                assertEquals("香盤表を編集 *", frame.getTitle());
+                assertEquals("未保存の変更", saveStatus.getText());
+
+                frame.writeEditableProject(output);
+
+                assertFalse(frame.hasUnsavedChanges());
+                assertEquals("香盤表を編集", frame.getTitle());
+                assertEquals("変更なし", saveStatus.getText());
             } finally {
                 frame.dispose();
             }
@@ -162,6 +236,33 @@ public class GuiComponentContractTest {
                 assertNotNull(status);
                 assertTrue(status.isVisible());
                 assertTrue(frame.currentProject().sheetBoundariesLocked());
+            } finally {
+                frame.dispose();
+            }
+        });
+    }
+
+    @Test
+    public void editorCommitsTheActiveCellBeforeClosing() throws Exception {
+        Assume.assumeFalse("画面表示できない環境ではSwing契約テストを実行しません。", GraphicsEnvironment.isHeadless());
+        AtomicReference<SetlistProject> changedProject = new AtomicReference<>();
+        runOnEventDispatchThread(() -> {
+            SetlistEditorFrame frame = new SetlistEditorFrame(projectWithOneEntry(), changedProject::set);
+            try {
+                frame.setVisible(true);
+                JTable table = findComponent(frame.getContentPane(), JTable.class);
+                assertNotNull(table);
+                assertTrue(table.editCellAt(0, 1));
+                JTextField editor = (JTextField) table.getEditorComponent();
+                editor.setText("閉じる直前の変更");
+
+                frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
+
+                assertNotNull(changedProject.get());
+                assertEquals(
+                        "閉じる直前の変更",
+                        changedProject.get().sessions().getFirst().entries().getFirst().title());
+                assertFalse(frame.isDisplayable());
             } finally {
                 frame.dispose();
             }

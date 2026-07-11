@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.swing.AbstractCellEditor;
 import javax.swing.BorderFactory;
@@ -55,27 +56,43 @@ public final class SetlistEditorFrame extends JFrame {
     private final List<SetlistEntryTableModel> tableModels;
     private final List<JTable> tables;
     private final Consumer<SetlistProject> projectChangedHandler;
+    private final BiConsumer<SetlistProject, File> projectSavedHandler;
     private final JButton addSessionButton;
     private final JButton removeSessionButton;
     private final JButton moveToAnotherSessionButton;
     private final JLabel boundaryStatusLabel;
+    private final JLabel saveStatusLabel;
     private boolean rebuilding;
     private boolean sheetBoundariesLocked;
+    private boolean unsavedChanges;
 
     public SetlistEditorFrame(SetlistProject project, Consumer<SetlistProject> projectChangedHandler) {
+        this(project, projectChangedHandler, (savedProject, outputFile) -> {
+        }, false);
+    }
+
+    SetlistEditorFrame(
+            SetlistProject project,
+            Consumer<SetlistProject> projectChangedHandler,
+            BiConsumer<SetlistProject, File> projectSavedHandler,
+            boolean initiallyUnsaved) {
         super("香盤表を編集");
         this.sessionTabs = new JTabbedPane();
         this.tableModels = new ArrayList<>();
         this.tables = new ArrayList<>();
         this.projectChangedHandler = Objects.requireNonNull(projectChangedHandler, "projectChangedHandler must not be null");
+        this.projectSavedHandler = Objects.requireNonNull(projectSavedHandler, "projectSavedHandler must not be null");
         this.addSessionButton = AppTheme.quietButton("公演を追加");
         this.removeSessionButton = AppTheme.quietButton("公演を削除");
         this.moveToAnotherSessionButton = AppTheme.quietButton("別の公演へ");
         this.boundaryStatusLabel = AppTheme.statusPill("シート境界を保持", new java.awt.Color(0x248A3D));
         this.boundaryStatusLabel.setToolTipText("XLSXの各シートを独立した公演として保持します。");
         this.boundaryStatusLabel.setVisible(false);
+        this.saveStatusLabel = AppTheme.statusPill("変更なし", AppTheme.TEXT_SECONDARY);
+        this.unsavedChanges = initiallyUnsaved;
         setupWindow();
         setProject(Objects.requireNonNull(project, "project must not be null"));
+        updateSaveStatus();
     }
 
     /** 現在の編集内容を取得します。 */
@@ -90,7 +107,7 @@ public final class SetlistEditorFrame extends JFrame {
     }
 
     private void setupWindow() {
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setIconImage(AppIcon.create(64));
         JPanel root = AppTheme.page(new BorderLayout(0, 16));
         root.setBorder(AppTheme.pagePadding());
@@ -110,11 +127,16 @@ public final class SetlistEditorFrame extends JFrame {
 
         AppTheme.bindMenuShortcut(getRootPane(), "save-project", KeyEvent.VK_S, this::saveProject);
         AppTheme.bindMenuShortcut(getRootPane(), "regenerate-project", KeyEvent.VK_R, this::regenerate);
-        AppTheme.bindMenuShortcut(getRootPane(), "close-editor", KeyEvent.VK_W, this::dispose);
+        AppTheme.bindMenuShortcut(getRootPane(), "close-editor", KeyEvent.VK_W, this::requestClose);
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowOpened(WindowEvent event) {
                 root.requestFocusInWindow();
+            }
+
+            @Override
+            public void windowClosing(WindowEvent event) {
+                requestClose();
             }
         });
 
@@ -139,10 +161,11 @@ public final class SetlistEditorFrame extends JFrame {
 
         regenerateButton.addActionListener(event -> regenerate());
         saveButton.addActionListener(event -> saveProject());
-        closeButton.addActionListener(event -> dispose());
+        closeButton.addActionListener(event -> requestClose());
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
+        actions.add(saveStatusLabel);
         actions.add(boundaryStatusLabel);
         actions.add(closeButton);
         actions.add(saveButton);
@@ -262,7 +285,6 @@ public final class SetlistEditorFrame extends JFrame {
             addSessionTab(session.name(), session.entries(), session.performerNames());
         }
         rebuilding = false;
-        publishProject();
     }
 
     private void updateSheetBoundaryControls() {
@@ -571,6 +593,7 @@ public final class SetlistEditorFrame extends JFrame {
         try {
             SetlistProject regenerated = new SetlistRegenerator().regenerate(currentProject());
             setProject(regenerated);
+            publishProject();
             JOptionPane.showMessageDialog(this, "固定演目を保持して未固定演目を再生成しました。");
         } catch (IllegalArgumentException exception) {
             showValidationError(exception.getMessage());
@@ -595,11 +618,32 @@ public final class SetlistEditorFrame extends JFrame {
             return;
         }
         try {
-            new XlsxSetlistProjectWriter().write(currentProject(), outputFile);
-            JOptionPane.showMessageDialog(this, "編集可能な香盤表を保存しました: " + outputFile.getAbsolutePath());
+            File savedFile = writeEditableProject(outputFile);
+            JOptionPane.showMessageDialog(this, "編集可能な香盤表を保存しました: " + savedFile.getAbsolutePath());
         } catch (IOException | IllegalArgumentException exception) {
             showValidationError("XLSXの保存に失敗しました: " + exception.getMessage());
         }
+    }
+
+    /** 現在の編集状態を保存し、未保存表示を解除します。 */
+    File writeEditableProject(File outputFile) throws IOException {
+        stopTableEditing();
+        SetlistProject project = currentProject();
+        File absoluteFile = outputFile.getAbsoluteFile();
+        new XlsxSetlistProjectWriter().write(project, absoluteFile);
+        setUnsavedChanges(false);
+        projectSavedHandler.accept(project, absoluteFile);
+        return absoluteFile;
+    }
+
+    /** メイン画面側の保存・終了前に、編集中セルの値を確定します。 */
+    void commitPendingEdits() {
+        stopTableEditing();
+    }
+
+    private void requestClose() {
+        commitPendingEdits();
+        dispose();
     }
 
     private void stopTableEditing() {
@@ -643,7 +687,30 @@ public final class SetlistEditorFrame extends JFrame {
 
     private void publishProject() {
         if (!rebuilding) {
+            setUnsavedChanges(true);
             projectChangedHandler.accept(currentProject());
+        }
+    }
+
+    boolean hasUnsavedChanges() {
+        return unsavedChanges;
+    }
+
+    private void setUnsavedChanges(boolean value) {
+        unsavedChanges = value;
+        updateSaveStatus();
+    }
+
+    private void updateSaveStatus() {
+        if (unsavedChanges) {
+            AppTheme.updateStatusPill(
+                    saveStatusLabel, "未保存の変更", new java.awt.Color(0xB54708));
+            saveStatusLabel.setToolTipText("編集状態をXLSX保存すると保護できます。");
+            setTitle("香盤表を編集 *");
+        } else {
+            AppTheme.updateStatusPill(saveStatusLabel, "変更なし", new java.awt.Color(0x248A3D));
+            saveStatusLabel.setToolTipText("現在の編集内容は保存済み、または変更されていません。");
+            setTitle("香盤表を編集");
         }
     }
 

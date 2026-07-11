@@ -141,6 +141,17 @@ public final class AppTheme {
         return new RoundedBadgeLabel(text, accentColor);
     }
 
+    /** 既存の状態ピルを、状態変化に合わせて更新します。 */
+    public static void updateStatusPill(JLabel label, String text, Color accentColor) {
+        label.setText(text);
+        label.setForeground(accentColor);
+        if (label instanceof RoundedBadgeLabel badgeLabel) {
+            badgeLabel.setAccentColor(accentColor);
+        }
+        label.revalidate();
+        label.repaint();
+    }
+
     public static JButton primaryButton(String text) {
         JButton button = new JButton(text);
         stylePrimary(button);
@@ -298,7 +309,7 @@ public final class AppTheme {
 
     private static final class RoundedBadgeLabel extends JLabel {
 
-        private final Color accentColor;
+        private Color accentColor;
 
         private RoundedBadgeLabel(String text, Color accentColor) {
             super(text);
@@ -307,6 +318,10 @@ public final class AppTheme {
             setForeground(accentColor);
             setOpaque(false);
             setBorder(new EmptyBorder(8, 25, 8, 13));
+        }
+
+        private void setAccentColor(Color accentColor) {
+            this.accentColor = accentColor;
         }
 
         @Override

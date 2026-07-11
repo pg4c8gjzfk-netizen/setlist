@@ -43,13 +43,25 @@ public class SetlistFrame extends JFrame {
     private final JButton startEditingButton;
     private final JButton newButton;
     private final JButton openProjectButton;
+    private final JButton saveProjectButton;
     private final JButton excelButton;
+    private final JLabel projectStatusLabel;
+    private final UnsavedChangesPrompt unsavedChangesPrompt;
     private SetlistProject currentProject;
     private boolean projectAvailable;
+    private boolean unsavedChanges;
+    private File editableProjectFile;
+    private SetlistEditorFrame activeEditor;
 
     /** メイン画面を作成します。 */
     public SetlistFrame() {
+        this(UnsavedChangesPrompt.swingDialog());
+    }
+
+    SetlistFrame(UnsavedChangesPrompt unsavedChangesPrompt) {
         super("Setlist Studio");
+        this.unsavedChangesPrompt = Objects.requireNonNull(
+                unsavedChangesPrompt, "unsavedChangesPrompt must not be null");
         this.dataFileBox = new JComboBox<>();
         this.resultArea = new JTextArea(22, 70);
         this.sheetHintLabel = AppTheme.body("XLSXファイルを選択してください。");
@@ -58,9 +70,12 @@ public class SetlistFrame extends JFrame {
         this.startEditingButton = AppTheme.primaryButton("編集を開始");
         this.newButton = AppTheme.quietButton("新規作成");
         this.openProjectButton = AppTheme.quietButton("編集済みXLSXを開く");
+        this.saveProjectButton = AppTheme.quietButton("編集状態を保存");
         this.excelButton = AppTheme.quietButton("配布用XLSX出力");
+        this.projectStatusLabel = AppTheme.statusPill("未作成", AppTheme.TEXT_SECONDARY);
         this.currentProject = SetlistProjectFactory.newEmptyProject();
         this.projectAvailable = false;
+        this.unsavedChanges = false;
 
         setupWindow();
         dataFileBox.addActionListener(event -> updateSelectedFileHint());
@@ -68,7 +83,7 @@ public class SetlistFrame extends JFrame {
     }
 
     private void setupWindow() {
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setIconImage(AppIcon.create(64));
         JPanel root = AppTheme.page(new BorderLayout(0, 18));
         root.setBorder(AppTheme.pagePadding());
@@ -91,6 +106,7 @@ public class SetlistFrame extends JFrame {
         resultArea.setText("まだプレビューはありません。\nデータを選び、「編集を開始」または「生成」を選択してください。");
         AppTheme.stylePreview(resultArea);
         editButton.setEnabled(false);
+        saveProjectButton.setEnabled(false);
         excelButton.setEnabled(false);
 
         root.add(createHeaderPanel(), BorderLayout.NORTH);
@@ -104,11 +120,17 @@ public class SetlistFrame extends JFrame {
         getRootPane().setDefaultButton(startEditingButton);
         AppTheme.bindMenuShortcut(getRootPane(), "new-project", KeyEvent.VK_N, newButton::doClick);
         AppTheme.bindMenuShortcut(getRootPane(), "open-project", KeyEvent.VK_O, openProjectButton::doClick);
+        AppTheme.bindMenuShortcut(getRootPane(), "save-project", KeyEvent.VK_S, saveProjectButton::doClick);
         AppTheme.bindMenuShortcut(getRootPane(), "generate-setlist", KeyEvent.VK_G, generateButton::doClick);
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowOpened(WindowEvent event) {
                 root.requestFocusInWindow();
+            }
+
+            @Override
+            public void windowClosing(WindowEvent event) {
+                requestApplicationClose();
             }
         });
         setMinimumSize(new Dimension(980, 660));
@@ -123,10 +145,8 @@ public class SetlistFrame extends JFrame {
         titleStack.add(Box.createVerticalStrut(5));
         titleStack.add(AppTheme.body("出演者の流れを整え、迷いなく本番へ進める香盤表ワークスペース"));
 
-        JLabel localBadge = AppTheme.statusPill("ローカル編集", new java.awt.Color(0x248A3D));
-
         panel.add(titleStack, BorderLayout.WEST);
-        panel.add(compactHolder(localBadge), BorderLayout.EAST);
+        panel.add(compactHolder(projectStatusLabel), BorderLayout.EAST);
         return panel;
     }
 
@@ -191,13 +211,15 @@ public class SetlistFrame extends JFrame {
         JPanel panel = AppTheme.page(new BorderLayout(16, 0));
         generateButton.addActionListener(event -> generateSetlist());
         startEditingButton.addActionListener(event -> startEditingSelectedData());
-        newButton.addActionListener(event -> openEditor(SetlistProjectFactory.newEmptyProject()));
+        newButton.addActionListener(event -> createNewProject());
         openProjectButton.addActionListener(event -> openSavedProject());
-        editButton.addActionListener(event -> openEditor(currentProject));
+        saveProjectButton.addActionListener(event -> saveEditableProject(true));
+        editButton.addActionListener(event -> openCurrentProjectEditor());
         excelButton.addActionListener(event -> exportCurrentProject());
 
         newButton.setToolTipText("空の香盤表から作成します（Ctrl/Command+N）");
         openProjectButton.setToolTipText("編集状態を保持したXLSXを開きます（Ctrl/Command+O）");
+        saveProjectButton.setToolTipText("再編集できる状態で保存します（Ctrl/Command+S）");
         generateButton.setToolTipText("入力データから曲順を自動生成します（Ctrl/Command+G）");
         startEditingButton.setToolTipText("入力データをそのまま公演タブで開きます");
         excelButton.setToolTipText("現在のプレビュー内容を配布用XLSXとして保存します");
@@ -206,6 +228,7 @@ public class SetlistFrame extends JFrame {
         leftActions.setOpaque(false);
         leftActions.add(newButton);
         leftActions.add(openProjectButton);
+        leftActions.add(saveProjectButton);
 
         JPanel rightActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         rightActions.setOpaque(false);
@@ -284,7 +307,12 @@ public class SetlistFrame extends JFrame {
         }
 
         List<PerformanceSheet> generatedSheets = new SetlistGenerator().generateWithinSheets(sourceSheets);
-        displayGeneratedProject(SetlistProjectFactory.fromImportedSheets(generatedSheets));
+        SetlistProject generatedProject = SetlistProjectFactory.fromImportedSheets(generatedSheets);
+        if (!confirmProjectReplacement("入力データから生成する")) {
+            return;
+        }
+        closeActiveEditor();
+        replaceCurrentProject(generatedProject, true, null);
     }
 
     private List<PerformanceSheet> loadPerformanceSheets(File selectedFile) {
@@ -308,7 +336,12 @@ public class SetlistFrame extends JFrame {
             showError("演目データを読み込めませんでした。");
             return;
         }
-        openEditor(SetlistProjectFactory.fromImportedSheets(performanceSheets));
+        if (!confirmProjectReplacement("入力データの編集を開始する")) {
+            return;
+        }
+        closeActiveEditor();
+        replaceCurrentProject(SetlistProjectFactory.fromImportedSheets(performanceSheets), false, null);
+        openCurrentProjectEditor();
     }
 
     /** 選択中のXLSXとシート境界の扱いを案内します。 */
@@ -330,21 +363,59 @@ public class SetlistFrame extends JFrame {
      * @param generatedProject 自動生成したプロジェクト
      */
     void displayGeneratedProject(SetlistProject generatedProject) {
-        updateCurrentProject(generatedProject);
+        replaceCurrentProject(generatedProject, true, null);
     }
 
-    private void openEditor(SetlistProject project) {
-        updateCurrentProject(project);
-        SetlistEditorFrame editor = new SetlistEditorFrame(project, this::updateCurrentProject);
+    private void createNewProject() {
+        if (!confirmProjectReplacement("新しい香盤表を作成する")) {
+            return;
+        }
+        closeActiveEditor();
+        replaceCurrentProject(SetlistProjectFactory.newEmptyProject(), false, null);
+        openCurrentProjectEditor();
+    }
+
+    private void openCurrentProjectEditor() {
+        if (activeEditor != null && activeEditor.isDisplayable()) {
+            activeEditor.toFront();
+            activeEditor.requestFocus();
+            return;
+        }
+        SetlistEditorFrame editor = new SetlistEditorFrame(
+                currentProject,
+                this::handleProjectChanged,
+                this::handleProjectSaved,
+                unsavedChanges);
+        activeEditor = editor;
+        editor.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent event) {
+                if (activeEditor == editor) {
+                    activeEditor = null;
+                }
+            }
+        });
         editor.setVisible(true);
     }
 
-    private void updateCurrentProject(SetlistProject project) {
+    private void handleProjectChanged(SetlistProject project) {
+        replaceCurrentProject(project, true, editableProjectFile);
+    }
+
+    private void handleProjectSaved(SetlistProject project, File outputFile) {
+        replaceCurrentProject(project, false, outputFile);
+    }
+
+    private void replaceCurrentProject(SetlistProject project, boolean dirty, File savedFile) {
         currentProject = Objects.requireNonNull(project, "project must not be null");
         projectAvailable = !currentProject.sessions().isEmpty();
+        unsavedChanges = dirty;
+        editableProjectFile = savedFile == null ? null : savedFile.getAbsoluteFile();
         editButton.setEnabled(projectAvailable);
+        saveProjectButton.setEnabled(projectAvailable);
         excelButton.setEnabled(projectAvailable);
         resultArea.setText(formatProject(currentProject));
+        updateProjectStatus();
     }
 
     private void openSavedProject() {
@@ -355,11 +426,131 @@ public class SetlistFrame extends JFrame {
             return;
         }
         try {
-            SetlistProject loadedProject = new XlsxSetlistProjectReader().read(chooser.getSelectedFile());
-            openEditor(loadedProject);
+            File inputFile = chooser.getSelectedFile().getAbsoluteFile();
+            SetlistProject loadedProject = new XlsxSetlistProjectReader().read(inputFile);
+            if (!confirmProjectReplacement("編集済みXLSXを開く")) {
+                return;
+            }
+            closeActiveEditor();
+            replaceCurrentProject(loadedProject, false, inputFile);
+            openCurrentProjectEditor();
         } catch (IOException | IllegalArgumentException exception) {
             showError("編集可能な香盤表XLSXを開けませんでした: " + exception.getMessage());
         }
+    }
+
+    private boolean saveEditableProject(boolean showCompletionMessage) {
+        if (!projectAvailable) {
+            showError("先に香盤表を作成または読み込んでください。");
+            return false;
+        }
+        synchronizeActiveEditor();
+        File outputFile = editableProjectFile;
+        if (outputFile == null) {
+            JFileChooser chooser = new JFileChooser(new File("Data/output"));
+            chooser.setDialogTitle("編集状態を保存");
+            chooser.setFileFilter(new FileNameExtensionFilter("Excelファイル (*.xlsx)", "xlsx"));
+            chooser.setSelectedFile(new File("Data/output", "setlist-project.xlsx"));
+            if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+                return false;
+            }
+            outputFile = ensureXlsxExtension(chooser.getSelectedFile()).getAbsoluteFile();
+            if (outputFile.exists() && JOptionPane.showConfirmDialog(
+                    this,
+                    outputFile.getName() + " を上書きしますか？",
+                    "上書き確認",
+                    JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+                return false;
+            }
+        }
+        try {
+            File savedFile = writeEditableProject(outputFile);
+            if (showCompletionMessage) {
+                JOptionPane.showMessageDialog(this, "編集状態を保存しました: " + savedFile.getAbsolutePath());
+            }
+            return true;
+        } catch (IOException | IllegalArgumentException exception) {
+            showError("編集状態の保存に失敗しました: " + exception.getMessage());
+            return false;
+        }
+    }
+
+    /** 現在の編集状態を再読込可能なXLSXとして保存します。 */
+    File writeEditableProject(File outputFile) throws IOException {
+        if (!projectAvailable) {
+            throw new IllegalStateException("保存できる香盤表がありません。");
+        }
+        File absoluteFile = outputFile.getAbsoluteFile();
+        if (activeEditor != null && activeEditor.isDisplayable()) {
+            return activeEditor.writeEditableProject(absoluteFile);
+        }
+        new XlsxSetlistProjectWriter().write(currentProject, absoluteFile);
+        replaceCurrentProject(currentProject, false, absoluteFile);
+        return absoluteFile;
+    }
+
+    /** 未保存内容がある場合だけ、保存・破棄・キャンセルを確認します。 */
+    boolean confirmProjectReplacement(String actionName) {
+        synchronizeActiveEditor();
+        if (!unsavedChanges) {
+            return true;
+        }
+        return switch (unsavedChangesPrompt.ask(this, actionName)) {
+            case SAVE -> saveEditableProject(false);
+            case DISCARD -> true;
+            case CANCEL -> false;
+        };
+    }
+
+    boolean hasUnsavedChanges() {
+        return unsavedChanges;
+    }
+
+    private void synchronizeActiveEditor() {
+        if (activeEditor != null && activeEditor.isDisplayable()) {
+            activeEditor.commitPendingEdits();
+        }
+    }
+
+    private void closeActiveEditor() {
+        if (activeEditor != null) {
+            SetlistEditorFrame editor = activeEditor;
+            activeEditor = null;
+            editor.dispose();
+        }
+    }
+
+    private void requestApplicationClose() {
+        if (!confirmProjectReplacement("アプリを終了する")) {
+            return;
+        }
+        closeActiveEditor();
+        dispose();
+    }
+
+    private void updateProjectStatus() {
+        if (!projectAvailable) {
+            AppTheme.updateStatusPill(projectStatusLabel, "未作成", AppTheme.TEXT_SECONDARY);
+            projectStatusLabel.setToolTipText("香盤表はまだ作成されていません。");
+            setTitle("Setlist Studio");
+            return;
+        }
+        if (unsavedChanges) {
+            AppTheme.updateStatusPill(
+                    projectStatusLabel, "未保存の変更", new java.awt.Color(0xB54708));
+            projectStatusLabel.setToolTipText("編集状態を保存すると、次回も再編集できます。");
+            setTitle("Setlist Studio *");
+            return;
+        }
+        if (editableProjectFile != null) {
+            AppTheme.updateStatusPill(projectStatusLabel, "保存済み", new java.awt.Color(0x248A3D));
+            projectStatusLabel.setToolTipText(editableProjectFile.getAbsolutePath());
+            setTitle("Setlist Studio");
+            return;
+        }
+        AppTheme.updateStatusPill(projectStatusLabel, "変更なし", AppTheme.TEXT_SECONDARY);
+        projectStatusLabel.setToolTipText("元データから変更されていません。");
+        setTitle("Setlist Studio");
     }
 
     private void exportCurrentProject() {
