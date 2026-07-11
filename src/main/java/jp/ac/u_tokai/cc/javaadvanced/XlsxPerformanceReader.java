@@ -4,11 +4,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
@@ -19,28 +16,9 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 /**
  * Excelファイル（.xlsx）から演目データを読み込むクラス。
  */
-public class XlsxPerformanceReader implements PerformanceDataReader {
+public class XlsxPerformanceReader {
     private static final int FIRST_PERFORMER_COLUMN = 2;
     private static final int MAX_ROW_NUMBER = 50;
-
-    /**
-     * Excelファイルからデータを読み込み、Mapに格納して返します。
-     * 複数シートを処理し、同じ演目名でも出演者が異なる場合は別演目として扱います。
-     *
-     * @param file 読み込み対象のExcelファイル
-     * @return タイトルをキー、演目を値とするMap
-     */
-    @Override
-    public Map<String, Performance> load(File file) {
-        Map<String, Performance> loadedMap = new LinkedHashMap<>();
-
-        for (PerformanceSheet performanceSheet : loadSheets(file)) {
-            for (Performance performance : performanceSheet.performances()) {
-                addFlattenedPerformance(loadedMap, performance, performanceSheet.name());
-            }
-        }
-        return loadedMap;
-    }
 
     /**
      * Excelの各シートを独立した演目グループとして読み込みます。
@@ -50,7 +28,6 @@ public class XlsxPerformanceReader implements PerformanceDataReader {
      * @param file 読み込み対象のExcelファイル
      * @return 元シート名と演目一覧
      */
-    @Override
     public List<PerformanceSheet> loadSheets(File file) {
         List<PerformanceSheet> performanceSheets = new ArrayList<>();
 
@@ -65,10 +42,9 @@ public class XlsxPerformanceReader implements PerformanceDataReader {
                     System.out.println("   シート「" + sheetName + "」はスキップします。");
                     continue;
                 }
-                Map<String, Performance> sheetPerformances = loadSheet(sheet);
+                List<Performance> sheetPerformances = loadSheet(sheet);
                 if (!sheetPerformances.isEmpty()) {
-                    performanceSheets.add(new PerformanceSheet(
-                            sheetName, List.copyOf(sheetPerformances.values())));
+                    performanceSheets.add(new PerformanceSheet(sheetName, sheetPerformances));
                 }
             }
         } catch (Exception e) {
@@ -82,16 +58,16 @@ public class XlsxPerformanceReader implements PerformanceDataReader {
     /**
      * 1シート分の演目データを読み込みます。
      */
-    private Map<String, Performance> loadSheet(Sheet sheet) {
+    private List<Performance> loadSheet(Sheet sheet) {
         String sheetName = sheet.getSheetName();
-        Map<String, Performance> loadedMap = new LinkedHashMap<>();
+        List<Performance> performances = new ArrayList<>();
 
         System.out.println("   シート「" + sheetName + "」の読み込みを開始します...");
         DataFormatter formatter = new DataFormatter();
         Row headerRow = sheet.getRow(0);
         if (headerRow == null) {
             System.out.println("[デバッグ] シート「" + sheetName + "」の1行目が存在しないためスキップします。");
-            return loadedMap;
+            return performances;
         }
 
         Map<Integer, String> performerNameMap = readPerformerNames(headerRow, formatter);
@@ -108,13 +84,13 @@ public class XlsxPerformanceReader implements PerformanceDataReader {
 
             try {
                 Performance performance = createPerformance(row, title, performerNameMap, formatter);
-                addPerformance(loadedMap, performance, sheetName);
+                performances.add(performance);
             } catch (NumberFormatException e) {
                 String durationText = formatter.formatCellValue(row.getCell(1));
                 System.out.println("[デバッグ] " + (rowIndex + 1) + "行目の「" + title + "」をスキップしました。時間欄: " + durationText);
             }
         }
-        return loadedMap;
+        return List.copyOf(performances);
     }
 
     /**
@@ -191,63 +167,4 @@ public class XlsxPerformanceReader implements PerformanceDataReader {
         return Integer.parseInt(cleanTime);
     }
 
-    /**
-     * 重複を確認しながら演目を登録します。
-     */
-    private void addPerformance(Map<String, Performance> loadedMap, Performance performance, String sheetName) {
-        if (isDuplicate(loadedMap, performance)) {
-            System.out.println("[デバッグ] 「" + performance.getTitle() + "」は同じ出演者で登録済みのためスキップしました。");
-            return;
-        }
-
-        String finalTitle = performance.getTitle();
-        if (loadedMap.containsKey(finalTitle)) {
-            finalTitle = createUniqueTitle(loadedMap, performance.getTitle(), sheetName);
-        }
-
-        Song song = new Song(finalTitle, performance.getPerformers(), performance.getDuration(), 0, "未指定");
-        loadedMap.put(song.getTitle(), song);
-    }
-
-    /** 平坦なMapを必要とする既存処理でも、別シートの演目を欠落させずに追加します。 */
-    private void addFlattenedPerformance(
-            Map<String, Performance> loadedMap, Performance performance, String sheetName) {
-        String finalTitle = performance.getTitle();
-        if (loadedMap.containsKey(finalTitle)) {
-            finalTitle = createUniqueTitle(loadedMap, performance.getTitle(), sheetName);
-        }
-        Song song = new Song(
-                finalTitle, performance.getPerformers(), performance.getDuration(), 0, "未指定");
-        loadedMap.put(song.getTitle(), song);
-    }
-
-    /**
-     * タイトルと出演者が同じ演目がすでに登録済みか判定します。
-     */
-    private boolean isDuplicate(Map<String, Performance> loadedMap, Performance performance) {
-        Set<String> newPerformersSet = new HashSet<>(performance.getPerformers());
-        for (Performance existing : loadedMap.values()) {
-            if (existing.getDisplayTitle().equals(performance.getDisplayTitle())) {
-                Set<String> existingPerformersSet = new HashSet<>(existing.getPerformers());
-                if (existingPerformersSet.equals(newPerformersSet)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * 同じ曲名で出演者が違う演目に一意なタイトルを付けます。
-     */
-    private String createUniqueTitle(Map<String, Performance> loadedMap, String title, String sheetName) {
-        String baseTitle = title + "(_" + sheetName + ")";
-        String candidate = baseTitle;
-        int version = 1;
-        while (loadedMap.containsKey(candidate)) {
-            version++;
-            candidate = baseTitle + " (ver" + version + ")";
-        }
-        return candidate;
-    }
 }

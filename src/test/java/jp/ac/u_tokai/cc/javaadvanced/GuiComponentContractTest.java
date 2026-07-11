@@ -44,6 +44,10 @@ public class GuiComponentContractTest {
                 JButton startEditingButton = findButton(frame.getContentPane(), "編集を開始");
                 assertNotNull(editButton);
                 assertNotNull(startEditingButton);
+                assertNotNull(findButton(frame.getContentPane(), "XLSX出力"));
+                assertNotNull(findComponent(
+                        frame.getContentPane(), JLabel.class,
+                        candidate -> "XLSXファイル".equals(candidate.getText())));
                 assertFalse(editButton.isEnabled());
                 assertNotNull(startEditingButton.getClientProperty(
                         com.formdev.flatlaf.FlatClientProperties.STYLE));

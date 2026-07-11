@@ -11,7 +11,7 @@ import java.util.Objects;
  */
 public record SetlistProject(List<SetlistSession> sessions, boolean sheetBoundariesLocked) {
 
-    /** シート境界を持たない手入力・CSV向けプロジェクトを作成します。 */
+    /** シート境界を持たない手入力向けプロジェクトを作成します。 */
     public SetlistProject(List<SetlistSession> sessions) {
         this(sessions, false);
     }

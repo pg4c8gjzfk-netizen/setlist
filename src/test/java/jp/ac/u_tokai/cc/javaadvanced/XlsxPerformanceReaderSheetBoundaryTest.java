@@ -39,7 +39,24 @@ public class XlsxPerformanceReaderSheetBoundaryTest {
         assertEquals(List.of("共通曲"), titles(sheets.get(1)));
     }
 
-    private void addPerformanceSheet(
+    @Test
+    public void duplicateRowsInOneSheetAreNotRemoved() throws Exception {
+        File workbookFile = temporaryFolder.newFile("duplicate-rows.xlsx");
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = addPerformanceSheet(workbook, "第1公演", "同名曲", "出演者A");
+            addPerformanceRow(sheet, 2, "同名曲");
+            try (FileOutputStream output = new FileOutputStream(workbookFile)) {
+                workbook.write(output);
+            }
+        }
+
+        List<PerformanceSheet> sheets = new XlsxPerformanceReader().loadSheets(workbookFile);
+
+        assertEquals(1, sheets.size());
+        assertEquals(List.of("同名曲", "同名曲"), titles(sheets.getFirst()));
+    }
+
+    private Sheet addPerformanceSheet(
             Workbook workbook, String sheetName, String title, String performer) {
         Sheet sheet = workbook.createSheet(sheetName);
         Row header = sheet.createRow(0);
@@ -48,7 +65,12 @@ public class XlsxPerformanceReaderSheetBoundaryTest {
         header.createCell(2).setCellValue(performer);
         header.createCell(3).setCellValue("備考");
 
-        Row performanceRow = sheet.createRow(1);
+        addPerformanceRow(sheet, 1, title);
+        return sheet;
+    }
+
+    private void addPerformanceRow(Sheet sheet, int rowIndex, String title) {
+        Row performanceRow = sheet.createRow(rowIndex);
         performanceRow.createCell(0).setCellValue(title);
         performanceRow.createCell(1).setCellValue("3:00");
         performanceRow.createCell(2).setCellValue("○");

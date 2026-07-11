@@ -8,7 +8,6 @@ target/
 # 個人情報を含むテストデータ（超重要！）
 Data/
 *.xlsx
-*.csv
 
 # 提出用に作成するzipはgit管理しない
 *.zip

@@ -2,7 +2,6 @@ package jp.ac.u_tokai.cc.javaadvanced;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,35 +11,6 @@ import java.util.Objects;
  * セットリストを自動生成するクラス。
  */
 public class SetlistGenerator {
-
-    /**
-     * 読み込まれた全演目データをもとに、指定された公演回数分のセットリストを生成します。
-     *
-     * @param allPerformances  全ての演目データが格納されたMap
-     * @param numberOfSessions 作成する公演回数
-     * @param capacities       各公演の演目数上限
-     * @param openers          各公演のオープニング曲名リスト
-     * @param closers          各公演のトリ曲名リスト
-     * @return 生成された複数公演分のセットリスト（二次元リスト）
-     */
-    public List<List<Performance>> generate(
-            Map<String, Performance> allPerformances,
-            int numberOfSessions,
-            int[] capacities,
-            String[] openers,
-            String[] closers) {
-        System.out.println("\n=== セットリストの自動生成を開始します ===");
-
-        int[] sessionCapacities = prepareCapacities(numberOfSessions, capacities);
-        List<List<Performance>> sessions = createEmptySessions(numberOfSessions);
-        List<List<Performance>> groups = groupByTitle(allPerformances);
-
-        assignPerformances(sessions, groups, sessionCapacities);
-        optimizeSessions(sessions, openers, closers);
-
-        System.out.println("セットリストの生成が完了しました！\n");
-        return sessions;
-    }
 
     /**
      * 入力シートごとに独立して曲順を生成します。
@@ -106,84 +76,6 @@ public class SetlistGenerator {
             }
         }
         return remainingCounts.isEmpty();
-    }
-
-    /**
-     * 各公演の演目数上限を準備します。
-     */
-    private int[] prepareCapacities(int numberOfSessions, int[] capacities) {
-        if (capacities != null) {
-            return capacities;
-        }
-
-        int[] defaultCapacities = new int[numberOfSessions];
-        for (int i = 0; i < numberOfSessions; i++) {
-            defaultCapacities[i] = Integer.MAX_VALUE;
-        }
-        return defaultCapacities;
-    }
-
-    /**
-     * 公演数分の空リストを作成します。
-     */
-    private List<List<Performance>> createEmptySessions(int numberOfSessions) {
-        List<List<Performance>> sessions = new ArrayList<>();
-        for (int i = 0; i < numberOfSessions; i++) {
-            sessions.add(new ArrayList<>());
-        }
-        System.out.println("[システム] " + numberOfSessions + " 公演分の空の枠を用意しました。");
-        return sessions;
-    }
-
-    /**
-     * 同じ表示名の演目をグループ化します。
-     */
-    private List<List<Performance>> groupByTitle(Map<String, Performance> allPerformances) {
-        Map<String, List<Performance>> groupedByTitle = new HashMap<>();
-        for (Performance performance : allPerformances.values()) {
-            groupedByTitle.putIfAbsent(performance.getDisplayTitle(), new ArrayList<>());
-            groupedByTitle.get(performance.getDisplayTitle()).add(performance);
-        }
-
-        List<List<Performance>> groups = new ArrayList<>(groupedByTitle.values());
-        Collections.shuffle(groups);
-        return groups;
-    }
-
-    /**
-     * 演目を公演へ振り分けます。
-     */
-    private void assignPerformances(List<List<Performance>> sessions, List<List<Performance>> groups, int[] capacities) {
-        int sessionIndex = 0;
-        for (List<Performance> group : groups) {
-            Collections.shuffle(group);
-            for (Performance performance : group) {
-                boolean assigned = false;
-                for (int i = 0; i < sessions.size(); i++) {
-                    int targetIndex = (sessionIndex + i) % sessions.size();
-                    if (sessions.get(targetIndex).size() < capacities[targetIndex]) {
-                        sessions.get(targetIndex).add(performance);
-                        sessionIndex = targetIndex + 1;
-                        assigned = true;
-                        break;
-                    }
-                }
-                if (!assigned) {
-                    System.out.println("[警告] 枠がいっぱいで「" + performance.getTitle() + "」を組み込めませんでした。");
-                }
-            }
-        }
-    }
-
-    /**
-     * 各公演内の順番を最適化します。
-     */
-    private void optimizeSessions(List<List<Performance>> sessions, String[] openers, String[] closers) {
-        for (int i = 0; i < sessions.size(); i++) {
-            String opener = (openers != null && openers.length > i) ? openers[i] : null;
-            String closer = (closers != null && closers.length > i) ? closers[i] : null;
-            sessions.set(i, optimizeOrder(sessions.get(i), opener, closer));
-        }
     }
 
     /**
