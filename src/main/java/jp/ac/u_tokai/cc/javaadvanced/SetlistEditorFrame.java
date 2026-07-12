@@ -96,7 +96,7 @@ public final class SetlistEditorFrame extends JFrame {
         this.addSessionButton = AppTheme.quietButton("公演を追加");
         this.removeSessionButton = AppTheme.quietButton("公演を削除");
         this.moveToAnotherSessionButton = AppTheme.quietButton("別の公演へ");
-        this.boundaryStatusLabel = AppTheme.statusPill("シート境界を保持", new java.awt.Color(0x248A3D));
+        this.boundaryStatusLabel = AppTheme.statusPill("シート境界を保持", AppTheme.SUCCESS);
         this.boundaryStatusLabel.setToolTipText("XLSXの各シートを独立した公演として保持します。");
         this.boundaryStatusLabel.setVisible(false);
         this.saveStatusLabel = AppTheme.statusPill("変更なし", AppTheme.TEXT_SECONDARY);
@@ -125,9 +125,7 @@ public final class SetlistEditorFrame extends JFrame {
         root.setFocusable(true);
         setContentPane(root);
 
-        sessionTabs.putClientProperty(
-                com.formdev.flatlaf.FlatClientProperties.STYLE,
-                "tabArc: 12; tabHeight: 40; selectedBackground: #FFFFFF; hoverColor: #ECECF0");
+        AppTheme.styleTabs(sessionTabs);
 
         root.add(createHeaderPanel(), BorderLayout.NORTH);
         JPanel editorCard = AppTheme.card(new BorderLayout());
@@ -176,6 +174,7 @@ public final class SetlistEditorFrame extends JFrame {
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
+        actions.add(AppTheme.themeToggleButton());
         actions.add(saveStatusLabel);
         actions.add(boundaryStatusLabel);
         actions.add(closeButton);
@@ -708,11 +707,11 @@ public final class SetlistEditorFrame extends JFrame {
     private void updateSaveStatus() {
         if (unsavedChanges) {
             AppTheme.updateStatusPill(
-                    saveStatusLabel, "未保存の変更", new java.awt.Color(0xB54708));
+                    saveStatusLabel, "未保存の変更", AppTheme.WARNING);
             saveStatusLabel.setToolTipText("編集状態をXLSX保存すると保護できます。");
             setTitle("香盤表を編集 *");
         } else {
-            AppTheme.updateStatusPill(saveStatusLabel, "変更なし", new java.awt.Color(0x248A3D));
+            AppTheme.updateStatusPill(saveStatusLabel, "変更なし", AppTheme.SUCCESS);
             saveStatusLabel.setToolTipText("現在の編集内容は保存済み、または変更されていません。");
             setTitle("香盤表を編集");
         }

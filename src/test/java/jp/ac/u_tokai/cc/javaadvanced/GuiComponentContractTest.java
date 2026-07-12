@@ -56,6 +56,7 @@ public class GuiComponentContractTest {
                 JButton chooseInputButton = findButton(frame.getContentPane(), "XLSXを選択");
                 JButton saveButton = findButton(frame.getContentPane(), "編集状態を保存");
                 JButton exportButton = findButton(frame.getContentPane(), "配布用XLSX出力");
+                assertNotNull(findButton(frame.getContentPane(), themeToggleLabel()));
                 assertNotNull(editButton);
                 assertNotNull(startEditingButton);
                 assertNotNull(exportButton);
@@ -216,6 +217,7 @@ public class GuiComponentContractTest {
                 assertNotNull(findButton(frame.getContentPane(), "指定順へ"));
                 assertTrue(findButton(frame.getContentPane(), "別の公演へ").isEnabled());
                 assertNotNull(findButton(frame.getContentPane(), "再生成"));
+                assertNotNull(findButton(frame.getContentPane(), themeToggleLabel()));
                 assertTrue(frame.getWidth() >= 1000);
                 assertShortcut(frame, KeyEvent.VK_S, "save-project");
                 assertShortcut(frame, KeyEvent.VK_R, "regenerate-project");
@@ -311,6 +313,10 @@ public class GuiComponentContractTest {
             }
         }
         return false;
+    }
+
+    private String themeToggleLabel() {
+        return AppTheme.isDark() ? "ライト表示" : "ダーク表示";
     }
 
     private int findColumn(Sheet sheet, String headerText) {

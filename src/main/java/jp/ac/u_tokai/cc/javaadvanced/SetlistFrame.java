@@ -144,8 +144,13 @@ public class SetlistFrame extends JFrame {
         titleStack.add(Box.createVerticalStrut(5));
         titleStack.add(AppTheme.body("出演者の流れを整え、迷いなく本番へ進める香盤表ワークスペース"));
 
+        JPanel appearance = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        appearance.setOpaque(false);
+        appearance.add(AppTheme.themeToggleButton());
+        appearance.add(projectStatusLabel);
+
         panel.add(titleStack, BorderLayout.WEST);
-        panel.add(compactHolder(projectStatusLabel), BorderLayout.EAST);
+        panel.add(appearance, BorderLayout.EAST);
         return panel;
     }
 
@@ -201,7 +206,7 @@ public class SetlistFrame extends JFrame {
         panel.add(header, BorderLayout.NORTH);
 
         JScrollPane previewScroll = AppTheme.scroll(resultArea);
-        previewScroll.setBorder(BorderFactory.createLineBorder(new java.awt.Color(0xE7E7EB)));
+        previewScroll.setBorder(BorderFactory.createLineBorder(AppTheme.BORDER));
         panel.add(previewScroll, BorderLayout.CENTER);
         return panel;
     }
@@ -254,13 +259,6 @@ public class SetlistFrame extends JFrame {
         group.add(Box.createVerticalStrut(6));
         group.add(component);
         return group;
-    }
-
-    private JPanel compactHolder(Component component) {
-        JPanel holder = new JPanel(new GridBagLayout());
-        holder.setOpaque(false);
-        holder.add(component);
-        return holder;
     }
 
     private JPanel transparentBoxPanel(int axis) {
@@ -549,13 +547,13 @@ public class SetlistFrame extends JFrame {
         }
         if (unsavedChanges) {
             AppTheme.updateStatusPill(
-                    projectStatusLabel, "未保存の変更", new java.awt.Color(0xB54708));
+                    projectStatusLabel, "未保存の変更", AppTheme.WARNING);
             projectStatusLabel.setToolTipText("編集状態を保存すると、次回も再編集できます。");
             setTitle("Setlist Studio *");
             return;
         }
         if (editableProjectFile != null) {
-            AppTheme.updateStatusPill(projectStatusLabel, "保存済み", new java.awt.Color(0x248A3D));
+            AppTheme.updateStatusPill(projectStatusLabel, "保存済み", AppTheme.SUCCESS);
             projectStatusLabel.setToolTipText(editableProjectFile.getAbsolutePath());
             setTitle("Setlist Studio");
             return;

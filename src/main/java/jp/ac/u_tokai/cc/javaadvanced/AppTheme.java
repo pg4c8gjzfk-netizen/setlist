@@ -1,9 +1,12 @@
 package jp.ac.u_tokai.cc.javaadvanced;
 
 import com.formdev.flatlaf.FlatClientProperties;
+import com.formdev.flatlaf.FlatLaf;
+import com.formdev.flatlaf.themes.FlatMacDarkLaf;
 import com.formdev.flatlaf.themes.FlatMacLightLaf;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -12,10 +15,14 @@ import java.awt.Insets;
 import java.awt.LayoutManager;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
+import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.prefs.BackingStoreException;
+import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
 import javax.swing.BorderFactory;
 import javax.swing.AbstractAction;
@@ -26,6 +33,7 @@ import javax.swing.JPanel;
 import javax.swing.JRootPane;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
@@ -35,17 +43,34 @@ import javax.swing.table.JTableHeader;
 /** アプリ全体の外観・余白・色・コンポーネント階層を統一します。 */
 public final class AppTheme {
 
-    public static final Color PAGE_BACKGROUND = new Color(0xF5F5F7);
-    public static final Color CARD_BACKGROUND = Color.WHITE;
-    public static final Color TEXT_PRIMARY = new Color(0x1D1D1F);
-    public static final Color TEXT_SECONDARY = new Color(0x6E6E73);
-    public static final Color ACCENT = new Color(0x0071E3);
-    public static final Color ACCENT_HOVER = new Color(0x0077ED);
-    public static final Color ACCENT_PRESSED = new Color(0x006EDB);
-    public static final Color BORDER = new Color(0xD9D9DE);
-    public static final Color SURFACE_SUBTLE = new Color(0xF8F8FA);
-    public static final Color SELECTION = new Color(0xE8F2FF);
-    public static final Color DANGER = new Color(0xD70015);
+    public enum Mode {
+        LIGHT,
+        DARK
+    }
+
+    private static final String THEME_PREFERENCE_KEY = "appearance";
+    private static final String BUTTON_STYLE_PROPERTY = "setlist.buttonStyle";
+    private static final String THEME_TOGGLE_PROPERTY = "setlist.themeToggle";
+    private static final String TABBED_PANE_PROPERTY = "setlist.tabbedPane";
+
+    private static volatile Mode currentMode = loadStoredMode();
+
+    public static final Color PAGE_BACKGROUND = themeColor(0xF5F5F7, 0x111113);
+    public static final Color CARD_BACKGROUND = themeColor(0xFFFFFF, 0x1C1C1E);
+    public static final Color TEXT_PRIMARY = themeColor(0x1D1D1F, 0xF5F5F7);
+    public static final Color TEXT_SECONDARY = themeColor(0x6E6E73, 0xA1A1A6);
+    public static final Color ACCENT = themeColor(0x0071E3, 0x0A84FF);
+    public static final Color ACCENT_HOVER = themeColor(0x0077ED, 0x409CFF);
+    public static final Color ACCENT_PRESSED = themeColor(0x006EDB, 0x0077ED);
+    public static final Color BORDER = themeColor(0xD9D9DE, 0x3A3A3C);
+    public static final Color SURFACE_SUBTLE = themeColor(0xF8F8FA, 0x242426);
+    public static final Color SELECTION = themeColor(0xE8F2FF, 0x173A5E);
+    public static final Color DANGER = themeColor(0xD70015, 0xFF6961);
+    public static final Color SUCCESS = themeColor(0x248A3D, 0x30D158);
+    public static final Color WARNING = themeColor(0xB54708, 0xFF9F0A);
+
+    private static final Color FOCUS = themeColor(0x80B7F0, 0x409CFF);
+    private static final Color GRID = themeColor(0xECECF0, 0x38383A);
 
     private static final Font BASE_FONT = chooseBaseFont();
     private static boolean installed;
@@ -66,7 +91,61 @@ public final class AppTheme {
             return;
         }
         configurePlatformProperties();
-        FlatMacLightLaf.setup();
+        installLookAndFeel();
+        configureUiDefaults();
+        installed = true;
+    }
+
+    /** 現在選択されている配色を返します。 */
+    public static Mode currentMode() {
+        return currentMode;
+    }
+
+    /** 現在の配色がダークかを返します。 */
+    public static boolean isDark() {
+        return currentMode == Mode.DARK;
+    }
+
+    /** 配色を即時切替し、次回起動用に保存します。 */
+    public static void setMode(Mode mode) {
+        applyMode(mode, true);
+    }
+
+    static synchronized void applyMode(Mode mode, boolean persist) {
+        Mode requestedMode = Objects.requireNonNull(mode, "mode must not be null");
+        if (persist) {
+            writeStoredMode(themePreferences(), requestedMode);
+        }
+        if (currentMode == requestedMode) {
+            return;
+        }
+        currentMode = requestedMode;
+        if (!installed) {
+            return;
+        }
+
+        installLookAndFeel();
+        configureUiDefaults();
+        for (Window window : Window.getWindows()) {
+            refreshThemeStyles(window);
+        }
+        FlatLaf.updateUI();
+        for (Window window : Window.getWindows()) {
+            window.repaint();
+        }
+        AppLog.info("表示テーマを" + (isDark() ? "ダーク" : "ライト") + "へ切り替えました。");
+    }
+
+    private static void installLookAndFeel() {
+        boolean installedSuccessfully = isDark()
+                ? FlatMacDarkLaf.setup()
+                : FlatMacLightLaf.setup();
+        if (!installedSuccessfully) {
+            AppLog.warn("表示テーマを適用できませんでした: " + currentMode);
+        }
+    }
+
+    private static void configureUiDefaults() {
 
         UIManager.put("defaultFont", BASE_FONT);
         UIManager.put("Component.arc", 14);
@@ -76,24 +155,23 @@ public final class AppTheme {
         UIManager.put("Spinner.arc", 12);
         UIManager.put("Component.focusWidth", 2);
         UIManager.put("Component.innerFocusWidth", 0);
-        UIManager.put("Component.focusColor", new Color(0x80B7F0));
+        UIManager.put("Component.focusColor", FOCUS);
         UIManager.put("ScrollBar.width", 10);
         UIManager.put("ScrollBar.thumbArc", 999);
         UIManager.put("TabbedPane.tabHeight", 38);
         UIManager.put("TabbedPane.tabArc", 12);
         UIManager.put("TabbedPane.selectedBackground", CARD_BACKGROUND);
-        UIManager.put("TabbedPane.hoverColor", new Color(0xECECF0));
+        UIManager.put("TabbedPane.hoverColor", GRID);
         UIManager.put("Table.rowHeight", 38);
         UIManager.put("Table.showHorizontalLines", true);
         UIManager.put("Table.showVerticalLines", false);
-        UIManager.put("Table.gridColor", new Color(0xECECF0));
+        UIManager.put("Table.gridColor", GRID);
         UIManager.put("Table.selectionBackground", SELECTION);
         UIManager.put("Table.selectionForeground", TEXT_PRIMARY);
         UIManager.put("TableHeader.background", SURFACE_SUBTLE);
         UIManager.put("TableHeader.foreground", TEXT_SECONDARY);
         UIManager.put("TableHeader.height", 38);
         UIManager.put("OptionPane.messageFont", BASE_FONT.deriveFont(14f));
-        installed = true;
     }
 
     /** ページ背景用パネルを作成します。 */
@@ -170,43 +248,83 @@ public final class AppTheme {
         return button;
     }
 
+    /** 現在と反対の配色へ切り替えるボタンを作成します。 */
+    public static JButton themeToggleButton() {
+        JButton button = quietButton("");
+        button.putClientProperty(THEME_TOGGLE_PROPERTY, Boolean.TRUE);
+        updateThemeToggleButton(button);
+        button.addActionListener(event -> {
+            setMode(isDark() ? Mode.LIGHT : Mode.DARK);
+            updateThemeToggleButton(button);
+        });
+        return button;
+    }
+
     public static void stylePrimary(JButton button) {
+        button.putClientProperty(BUTTON_STYLE_PROPERTY, "primary");
         button.putClientProperty(FlatClientProperties.BUTTON_TYPE,
                 FlatClientProperties.BUTTON_TYPE_ROUND_RECT);
         button.putClientProperty(FlatClientProperties.STYLE,
                 "arc: 16; minimumWidth: 96; borderWidth: 0; focusWidth: 2;"
-                        + "background: #0071E3; foreground: #FFFFFF;"
-                        + "hoverBackground: #0077ED; pressedBackground: #006EDB;"
+                        + (isDark()
+                                ? "background: #0A84FF; foreground: #FFFFFF;"
+                                        + "hoverBackground: #409CFF; pressedBackground: #0077ED;"
+                                : "background: #0071E3; foreground: #FFFFFF;"
+                                        + "hoverBackground: #0077ED; pressedBackground: #006EDB;")
                         + "margin: 8,18,8,18");
     }
 
     public static void styleSecondary(JButton button) {
+        button.putClientProperty(BUTTON_STYLE_PROPERTY, "secondary");
         button.putClientProperty(FlatClientProperties.BUTTON_TYPE,
                 FlatClientProperties.BUTTON_TYPE_ROUND_RECT);
         button.putClientProperty(FlatClientProperties.STYLE,
                 "arc: 16; minimumWidth: 88; borderWidth: 1; focusWidth: 2;"
-                        + "background: #FFFFFF; foreground: #1D1D1F; borderColor: #D2D2D7;"
-                        + "hoverBackground: #F5F5F7; pressedBackground: #EDEDF0;"
+                        + (isDark()
+                                ? "background: #2C2C2E; foreground: #F5F5F7; borderColor: #48484A;"
+                                        + "hoverBackground: #3A3A3C; pressedBackground: #444446;"
+                                : "background: #FFFFFF; foreground: #1D1D1F; borderColor: #D2D2D7;"
+                                        + "hoverBackground: #F5F5F7; pressedBackground: #EDEDF0;")
                         + "margin: 8,15,8,15");
     }
 
     public static void styleQuiet(JButton button) {
+        button.putClientProperty(BUTTON_STYLE_PROPERTY, "quiet");
         button.putClientProperty(FlatClientProperties.BUTTON_TYPE,
                 FlatClientProperties.BUTTON_TYPE_ROUND_RECT);
         button.putClientProperty(FlatClientProperties.STYLE,
                 "arc: 14; minimumWidth: 72; borderWidth: 0; focusWidth: 2;"
-                        + "background: #F2F2F5; foreground: #1D1D1F;"
-                        + "hoverBackground: #E8E8ED; pressedBackground: #DDDDE2;"
+                        + (isDark()
+                                ? "background: #2C2C2E; foreground: #F5F5F7;"
+                                        + "hoverBackground: #3A3A3C; pressedBackground: #48484A;"
+                                : "background: #F2F2F5; foreground: #1D1D1F;"
+                                        + "hoverBackground: #E8E8ED; pressedBackground: #DDDDE2;")
                         + "margin: 7,13,7,13");
     }
 
     public static void styleDanger(JButton button) {
-        styleQuiet(button);
+        button.putClientProperty(BUTTON_STYLE_PROPERTY, "danger");
+        button.putClientProperty(FlatClientProperties.BUTTON_TYPE,
+                FlatClientProperties.BUTTON_TYPE_ROUND_RECT);
         button.putClientProperty(FlatClientProperties.STYLE,
                 "arc: 14; minimumWidth: 72; borderWidth: 0; focusWidth: 2;"
-                        + "background: #FFF1F0; foreground: #D70015;"
-                        + "hoverBackground: #FFE5E3; pressedBackground: #FFD7D4;"
+                        + (isDark()
+                                ? "background: #3A2022; foreground: #FF6961;"
+                                        + "hoverBackground: #4A2528; pressedBackground: #562C30;"
+                                : "background: #FFF1F0; foreground: #D70015;"
+                                        + "hoverBackground: #FFE5E3; pressedBackground: #FFD7D4;")
                         + "margin: 7,13,7,13");
+    }
+
+    /** 公演タブへ現在の配色に合う選択・ホバー色を設定します。 */
+    public static void styleTabs(JTabbedPane tabs) {
+        tabs.putClientProperty(TABBED_PANE_PROPERTY, Boolean.TRUE);
+        tabs.putClientProperty(
+                FlatClientProperties.STYLE,
+                "tabArc: 12; tabHeight: 40;"
+                        + (isDark()
+                                ? "selectedBackground: #1C1C1E; hoverColor: #38383A"
+                                : "selectedBackground: #FFFFFF; hoverColor: #ECECF0"));
     }
 
     /** 表とヘッダーを読みやすい密度へ整えます。 */
@@ -214,7 +332,7 @@ public final class AppTheme {
         table.setRowHeight(38);
         table.setShowVerticalLines(false);
         table.setShowHorizontalLines(true);
-        table.setGridColor(new Color(0xECECF0));
+        table.setGridColor(GRID);
         table.setIntercellSpacing(new java.awt.Dimension(0, 1));
         table.setSelectionBackground(SELECTION);
         table.setSelectionForeground(TEXT_PRIMARY);
@@ -262,6 +380,77 @@ public final class AppTheme {
         });
     }
 
+    static Mode readStoredMode(Preferences preferences) {
+        String storedValue = preferences.get(THEME_PREFERENCE_KEY, Mode.LIGHT.name());
+        try {
+            return Mode.valueOf(storedValue);
+        } catch (IllegalArgumentException exception) {
+            return Mode.LIGHT;
+        }
+    }
+
+    static void writeStoredMode(Preferences preferences, Mode mode) {
+        try {
+            preferences.put(THEME_PREFERENCE_KEY, mode.name());
+            preferences.flush();
+        } catch (BackingStoreException | RuntimeException exception) {
+            AppLog.warn("表示テーマの設定を保存できませんでした: " + exception.getMessage());
+        }
+    }
+
+    private static Mode loadStoredMode() {
+        try {
+            return readStoredMode(themePreferences());
+        } catch (RuntimeException exception) {
+            return Mode.LIGHT;
+        }
+    }
+
+    private static Preferences themePreferences() {
+        return Preferences.userNodeForPackage(AppTheme.class).node("appearance");
+    }
+
+    private static void updateThemeToggleButton(JButton button) {
+        boolean dark = isDark();
+        button.setText(dark ? "ライト表示" : "ダーク表示");
+        button.setToolTipText(dark
+                ? "画面をライトテーマへ切り替えます"
+                : "画面をダークテーマへ切り替えます");
+        button.getAccessibleContext().setAccessibleName(button.getText());
+        button.getAccessibleContext().setAccessibleDescription(button.getToolTipText());
+    }
+
+    private static void refreshThemeStyles(Component component) {
+        if (component instanceof JButton button) {
+            Object style = button.getClientProperty(BUTTON_STYLE_PROPERTY);
+            if ("primary".equals(style)) {
+                stylePrimary(button);
+            } else if ("secondary".equals(style)) {
+                styleSecondary(button);
+            } else if ("danger".equals(style)) {
+                styleDanger(button);
+            } else if ("quiet".equals(style)) {
+                styleQuiet(button);
+            }
+            if (Boolean.TRUE.equals(button.getClientProperty(THEME_TOGGLE_PROPERTY))) {
+                updateThemeToggleButton(button);
+            }
+        }
+        if (component instanceof JTabbedPane tabs
+                && Boolean.TRUE.equals(tabs.getClientProperty(TABBED_PANE_PROPERTY))) {
+            styleTabs(tabs);
+        }
+        if (component instanceof Container container) {
+            for (Component child : container.getComponents()) {
+                refreshThemeStyles(child);
+            }
+        }
+    }
+
+    private static Color themeColor(int lightRgb, int darkRgb) {
+        return new ThemeColor(lightRgb, darkRgb);
+    }
+
     private static Font chooseBaseFont() {
         String osName = System.getProperty("os.name", "").toLowerCase();
         List<String> candidates = osName.contains("mac")
@@ -277,6 +466,27 @@ public final class AppTheme {
             }
         }
         return new Font(Font.DIALOG, Font.PLAIN, 14);
+    }
+
+    /** 同じColor参照のまま、現在の配色に応じたRGB値を返します。 */
+    private static final class ThemeColor extends Color {
+
+        private static final long serialVersionUID = 1L;
+
+        private final int lightRgb;
+        private final int darkRgb;
+
+        private ThemeColor(int lightRgb, int darkRgb) {
+            super(lightRgb);
+            this.lightRgb = lightRgb;
+            this.darkRgb = darkRgb;
+        }
+
+        @Override
+        public int getRGB() {
+            int rgb = isDark() ? darkRgb : lightRgb;
+            return 0xFF000000 | rgb;
+        }
     }
 
     /** 余白を内包し、アンチエイリアス付きで描画するカードです。 */

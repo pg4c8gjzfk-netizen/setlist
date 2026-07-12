@@ -1,7 +1,6 @@
 package jp.ac.u_tokai.cc.javaadvanced;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Window;
@@ -25,8 +24,6 @@ import javax.swing.KeyStroke;
 final class PerformerBatchAddDialog extends JDialog {
 
     private static final long serialVersionUID = 1L;
-    private static final Color SUCCESS = new Color(0x248A3D);
-
     private final Consumer<String> performerAdder;
     private final JTextField performerNameField;
     private final JLabel feedbackLabel;
@@ -107,7 +104,7 @@ final class PerformerBatchAddDialog extends JDialog {
             addedCount++;
             feedbackLabel.setText(
                     "追加済み " + addedCount + "人 — 「" + performerName + "」を追加しました。");
-            feedbackLabel.setForeground(SUCCESS);
+            feedbackLabel.setForeground(AppTheme.SUCCESS);
             performerNameField.setText("");
         } catch (IllegalArgumentException exception) {
             String message = exception.getMessage();
