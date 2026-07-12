@@ -421,16 +421,8 @@ public final class SetlistEditorFrame extends JFrame {
 
     private void addPerformer() {
         selectedModel().ifPresent(model -> {
-            String performerName = JOptionPane.showInputDialog(
-                    this, "追加する演者名を入力してください。", "演者を追加", JOptionPane.PLAIN_MESSAGE);
-            if (performerName == null) {
-                return;
-            }
-            try {
-                model.addPerformer(performerName);
-            } catch (IllegalArgumentException exception) {
-                showValidationError(exception.getMessage());
-            }
+            PerformerBatchAddDialog dialog = new PerformerBatchAddDialog(this, model::addPerformer);
+            dialog.setVisible(true);
         });
     }
 
