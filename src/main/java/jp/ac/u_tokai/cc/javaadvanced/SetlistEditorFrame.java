@@ -632,7 +632,7 @@ public final class SetlistEditorFrame extends JFrame {
             File savedFile = writeEditableProject(outputFile);
             JOptionPane.showMessageDialog(this, "編集可能な香盤表を保存しました: " + savedFile.getAbsolutePath());
         } catch (IOException | IllegalArgumentException exception) {
-            showValidationError("XLSXの保存に失敗しました: " + exception.getMessage());
+            showOperationError("XLSXの保存に失敗しました: " + exception.getMessage(), exception);
         }
     }
 
@@ -727,7 +727,13 @@ public final class SetlistEditorFrame extends JFrame {
     }
 
     private void showValidationError(String message) {
+        AppLog.warn(message);
         JOptionPane.showMessageDialog(this, message, "入力エラー", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private void showOperationError(String message, Throwable throwable) {
+        AppLog.error(message, throwable);
+        JOptionPane.showMessageDialog(this, message, "エラー", JOptionPane.ERROR_MESSAGE);
     }
 
     /** 演目がない場合にも、次の操作を画面内で案内する表です。 */

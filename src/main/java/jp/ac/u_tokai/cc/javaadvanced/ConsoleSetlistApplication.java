@@ -42,6 +42,7 @@ public class ConsoleSetlistApplication {
             try {
                 sourceSheets = new XlsxPerformanceReader().loadSheets(selectedFile);
             } catch (IllegalArgumentException exception) {
+                AppLog.error("コンソールでXLSXを読み込めませんでした。", exception);
                 System.out.println("XLSXを読み込めませんでした。\n" + exception.getMessage());
                 return;
             }
@@ -185,8 +186,10 @@ public class ConsoleSetlistApplication {
         try {
             File outputFile = new XlsxSetlistExporter(fileLocations.outputDirectory().toPath())
                     .export(generatedSheets, OUTPUT_FILE);
+            AppLog.info("コンソールから配布用XLSXを保存しました: " + outputFile.getAbsolutePath());
             System.out.println("\n>>> 保存先: " + outputFile.getAbsolutePath());
         } catch (IOException | IllegalArgumentException exception) {
+            AppLog.error("コンソールでXLSXの保存に失敗しました。", exception);
             throw new IllegalStateException("XLSXの保存に失敗しました。", exception);
         }
     }

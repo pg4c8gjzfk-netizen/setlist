@@ -280,7 +280,7 @@ public class SetlistFrame extends JFrame {
         try {
             setSelectedInputFile(chooser.getSelectedFile());
         } catch (IllegalArgumentException exception) {
-            showError(exception.getMessage());
+            showError(exception.getMessage(), exception);
         }
     }
 
@@ -298,6 +298,7 @@ public class SetlistFrame extends JFrame {
         generateButton.setEnabled(true);
         startEditingButton.setEnabled(true);
         sheetHintLabel.setText("● 選択済み。各シートを独立した公演として保持し、シート間の再配分は行いません。");
+        AppLog.info("入力XLSXを選択しました: " + selectedInputFile.getAbsolutePath());
     }
 
     private void generateSetlist() {
@@ -311,7 +312,7 @@ public class SetlistFrame extends JFrame {
         try {
             sourceSheets = loadPerformanceSheets(selectedFile);
         } catch (IllegalArgumentException exception) {
-            showError(exception.getMessage());
+            showError(exception.getMessage(), exception);
             return;
         }
         if (sourceSheets.isEmpty()) {
@@ -342,7 +343,7 @@ public class SetlistFrame extends JFrame {
         try {
             performanceSheets = loadPerformanceSheets(selectedFile);
         } catch (IllegalArgumentException exception) {
-            showError(exception.getMessage());
+            showError(exception.getMessage(), exception);
             return;
         }
         if (performanceSheets.isEmpty()) {
@@ -407,6 +408,7 @@ public class SetlistFrame extends JFrame {
 
     private void handleProjectSaved(SetlistProject project, File outputFile) {
         fileLocations.rememberOutputFile(outputFile);
+        AppLog.info("編集可能な香盤表を保存しました: " + outputFile.getAbsolutePath());
         replaceCurrentProject(project, false, outputFile);
     }
 
@@ -420,6 +422,8 @@ public class SetlistFrame extends JFrame {
         excelButton.setEnabled(projectAvailable);
         resultArea.setText(formatProject(currentProject));
         updateProjectStatus();
+        AppLog.info("香盤表を更新しました。公演数=" + project.sessions().size()
+                + ", 未保存=" + dirty);
     }
 
     private void openSavedProject() {
@@ -440,7 +444,7 @@ public class SetlistFrame extends JFrame {
             replaceCurrentProject(loadedProject, false, inputFile);
             openCurrentProjectEditor();
         } catch (IOException | IllegalArgumentException exception) {
-            showError("編集可能な香盤表XLSXを開けませんでした: " + exception.getMessage());
+            showError("編集可能な香盤表XLSXを開けませんでした: " + exception.getMessage(), exception);
         }
     }
 
@@ -475,7 +479,7 @@ public class SetlistFrame extends JFrame {
             }
             return true;
         } catch (IOException | IllegalArgumentException exception) {
-            showError("編集状態の保存に失敗しました: " + exception.getMessage());
+            showError("編集状態の保存に失敗しました: " + exception.getMessage(), exception);
             return false;
         }
     }
@@ -491,6 +495,7 @@ public class SetlistFrame extends JFrame {
         }
         new XlsxSetlistProjectWriter().write(currentProject, absoluteFile);
         fileLocations.rememberOutputFile(absoluteFile);
+        AppLog.info("編集可能な香盤表を保存しました: " + absoluteFile.getAbsolutePath());
         replaceCurrentProject(currentProject, false, absoluteFile);
         return absoluteFile;
     }
@@ -530,6 +535,7 @@ public class SetlistFrame extends JFrame {
         if (!confirmProjectReplacement("アプリを終了する")) {
             return;
         }
+        AppLog.info("アプリケーションを終了します。");
         closeActiveEditor();
         dispose();
     }
@@ -583,9 +589,10 @@ public class SetlistFrame extends JFrame {
         try {
             File savedFile = writeCurrentProject(outputFile);
             fileLocations.rememberOutputFile(savedFile);
+            AppLog.info("配布用XLSXを保存しました: " + savedFile.getAbsolutePath());
             JOptionPane.showMessageDialog(this, "配布用XLSXを保存しました: " + savedFile.getAbsolutePath());
         } catch (IOException | IllegalArgumentException exception) {
-            showError("XLSXの出力に失敗しました: " + exception.getMessage());
+            showError("XLSXの出力に失敗しました: " + exception.getMessage(), exception);
         }
     }
 
@@ -625,6 +632,12 @@ public class SetlistFrame extends JFrame {
     }
 
     private void showError(String message) {
+        AppLog.warn(message);
+        JOptionPane.showMessageDialog(this, message, "エラー", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private void showError(String message, Throwable throwable) {
+        AppLog.error(message, throwable);
         JOptionPane.showMessageDialog(this, message, "エラー", JOptionPane.ERROR_MESSAGE);
     }
 

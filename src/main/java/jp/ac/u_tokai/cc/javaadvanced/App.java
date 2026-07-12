@@ -19,12 +19,15 @@ public class App {
      * @param args コマンドライン引数
      */
     public static void main(String[] args) {
+        AppLog.initialize();
         AppTheme.configurePlatformProperties();
         if (GraphicsEnvironment.isHeadless() || hasConsoleOption(args)) {
+            AppLog.info("コンソールモードで起動します。");
             new ConsoleSetlistApplication().run();
             return;
         }
 
+        AppLog.info("GUIモードで起動します。");
         AppTheme.install();
         SwingUtilities.invokeLater(() -> new SetlistFrame().showScreen());
     }
