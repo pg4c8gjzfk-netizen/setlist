@@ -29,6 +29,7 @@ import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.Assume;
 import org.junit.BeforeClass;
@@ -159,8 +160,11 @@ public class GuiComponentContractTest {
                 frame.writeCurrentProject(output);
 
                 try (Workbook workbook = new XSSFWorkbook(output)) {
-                    assertEquals("編集後の演目", workbook.getSheetAt(0).getRow(1).getCell(1).getStringCellValue());
-                    assertEquals("代理出演者", workbook.getSheetAt(0).getRow(1).getCell(3).getStringCellValue());
+                    Sheet sheet = workbook.getSheetAt(0);
+                    assertEquals("編集後の演目", sheet.getRow(1).getCell(1).getStringCellValue());
+                    int proxyPerformerColumn = findColumn(sheet, "代理出演者");
+                    assertTrue(proxyPerformerColumn >= 3);
+                    assertEquals("○", sheet.getRow(1).getCell(proxyPerformerColumn).getStringCellValue());
                 }
             } finally {
                 frame.dispose();
@@ -307,6 +311,15 @@ public class GuiComponentContractTest {
             }
         }
         return false;
+    }
+
+    private int findColumn(Sheet sheet, String headerText) {
+        for (int column = 0; column < sheet.getRow(0).getLastCellNum(); column++) {
+            if (headerText.equals(sheet.getRow(0).getCell(column).getStringCellValue())) {
+                return column;
+            }
+        }
+        return -1;
     }
 
     private JButton findButton(Container root, String text) {
