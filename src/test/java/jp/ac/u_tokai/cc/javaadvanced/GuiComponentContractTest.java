@@ -11,11 +11,13 @@ import java.awt.Container;
 import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
+import java.awt.Window;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -25,6 +27,8 @@ import javax.swing.JFrame;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JTable;
+import javax.swing.JTabbedPane;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
@@ -99,11 +103,75 @@ public class GuiComponentContractTest {
                 assertTrue(saveButton.isEnabled());
                 assertTrue(exportButton.isEnabled());
                 assertTrue(frame.hasUnsavedChanges());
-                assertEquals("Setlist Studio *", frame.getTitle());
+                assertEquals("Setlist Studio — 新しい香盤表.xlsx *", frame.getTitle());
                 assertNotNull(findComponent(
                         frame.getContentPane(), JLabel.class,
                         candidate -> "未保存の変更".equals(candidate.getText())));
             } finally {
+                frame.dispose();
+            }
+        });
+    }
+
+    @Test
+    public void newProjectAlwaysRequestsSettingsAndReflectsThemAcrossTheApplication() throws Exception {
+        Assume.assumeFalse("画面表示できない環境ではSwing契約テストを実行しません。", GraphicsEnvironment.isHeadless());
+        AtomicReference<Optional<NewSetlistSettings>> requestedSettings =
+                new AtomicReference<>(Optional.empty());
+        AtomicInteger promptCount = new AtomicInteger();
+        File defaultDirectory = Files.createTempDirectory("new-setlist-settings-").toFile();
+        defaultDirectory.deleteOnExit();
+        runOnEventDispatchThread(() -> {
+            SetlistFrame frame = new SetlistFrame(
+                    (parent, actionName) -> UnsavedChangesPrompt.Decision.DISCARD,
+                    parent -> {
+                        promptCount.incrementAndGet();
+                        return requestedSettings.get();
+                    },
+                    new AppFileLocations(defaultDirectory));
+            SetlistEditorFrame editor = null;
+            try {
+                JButton newButton = findButton(frame.getContentPane(), "新規作成");
+                JButton saveButton = findButton(frame.getContentPane(), "編集状態を保存");
+
+                newButton.doClick();
+                assertEquals(1, promptCount.get());
+                assertFalse(saveButton.isEnabled());
+                assertEquals("Setlist Studio", frame.getTitle());
+
+                requestedSettings.set(Optional.of(new NewSetlistSettings("夏公演", 4)));
+                newButton.doClick();
+
+                assertEquals(2, promptCount.get());
+                assertEquals("夏公演.xlsx", frame.projectFileName());
+                assertEquals(4, frame.currentProject().sessions().size());
+                assertEquals(
+                        List.of("第1公演", "第2公演", "第3公演", "第4公演"),
+                        frame.currentProject().sessions().stream().map(SetlistSession::name).toList());
+                assertEquals("Setlist Studio — 夏公演.xlsx *", frame.getTitle());
+                JTextArea preview = findComponent(frame.getContentPane(), JTextArea.class);
+                assertNotNull(preview);
+                assertTrue(preview.getText().startsWith("ファイル名: 夏公演.xlsx"));
+                assertTrue(preview.getText().contains("【第4公演】"));
+
+                editor = findVisibleEditor("香盤表を編集 — 夏公演.xlsx *");
+                assertNotNull(editor);
+                JTabbedPane tabs = findComponent(editor.getContentPane(), JTabbedPane.class);
+                assertNotNull(tabs);
+                assertEquals(4, tabs.getTabCount());
+
+                File output = frame.suggestedEditableOutputFile();
+                assertEquals("夏公演.xlsx", output.getName());
+                frame.writeEditableProject(output);
+                assertTrue(output.isFile());
+                assertEquals("Setlist Studio — 夏公演.xlsx", frame.getTitle());
+                SetlistProject restored = new XlsxSetlistProjectReader().read(output);
+                assertEquals(4, restored.sessions().size());
+                assertEquals("第4公演", restored.sessions().get(3).name());
+            } finally {
+                if (editor != null) {
+                    editor.dispose();
+                }
                 frame.dispose();
             }
         });
@@ -135,7 +203,7 @@ public class GuiComponentContractTest {
                 frame.writeEditableProject(output);
 
                 assertFalse(frame.hasUnsavedChanges());
-                assertEquals("Setlist Studio", frame.getTitle());
+                assertEquals("Setlist Studio — " + output.getName(), frame.getTitle());
                 assertNotNull(findComponent(
                         frame.getContentPane(), JLabel.class,
                         candidate -> "保存済み".equals(candidate.getText())));
@@ -237,7 +305,7 @@ public class GuiComponentContractTest {
                 frame.writeEditableProject(output);
 
                 assertFalse(frame.hasUnsavedChanges());
-                assertEquals("香盤表を編集", frame.getTitle());
+                assertEquals("香盤表を編集 — " + output.getName(), frame.getTitle());
                 assertEquals("変更なし", saveStatus.getText());
             } finally {
                 frame.dispose();
@@ -299,6 +367,17 @@ public class GuiComponentContractTest {
 
     private SetlistProject projectWithOneEntry() {
         return projectWithEntry("確認用演目", List.of("出演者A"));
+    }
+
+    private SetlistEditorFrame findVisibleEditor(String expectedTitle) {
+        for (Window window : Window.getWindows()) {
+            if (window instanceof SetlistEditorFrame editor
+                    && editor.isDisplayable()
+                    && expectedTitle.equals(editor.getTitle())) {
+                return editor;
+            }
+        }
+        return null;
     }
 
     private SetlistProject projectWithEntry(String title, List<String> performers) {

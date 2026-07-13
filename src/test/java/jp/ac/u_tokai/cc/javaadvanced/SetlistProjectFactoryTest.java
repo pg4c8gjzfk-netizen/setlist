@@ -32,4 +32,14 @@ public class SetlistProjectFactoryTest {
         assertEquals(List.of("出演者B", "控えB"), project.sessions().get(1).performerNames());
         assertTrue(project.sheetBoundariesLocked());
     }
+
+    @Test
+    public void emptyProjectCreatesRequestedNumberOfIndependentSessions() {
+        SetlistProject project = SetlistProjectFactory.newEmptyProject(4);
+
+        assertEquals(
+                List.of("第1公演", "第2公演", "第3公演", "第4公演"),
+                project.sessions().stream().map(SetlistSession::name).toList());
+        assertTrue(project.sessions().stream().allMatch(session -> session.entries().isEmpty()));
+    }
 }

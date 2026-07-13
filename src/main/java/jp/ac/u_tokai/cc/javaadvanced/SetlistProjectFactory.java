@@ -31,6 +31,18 @@ public final class SetlistProjectFactory {
 
     /** GUIで手入力を始めるための空プロジェクトを作成します。 */
     public static SetlistProject newEmptyProject() {
-        return new SetlistProject(List.of(new SetlistSession("第1公演", List.of())));
+        return newEmptyProject(1);
+    }
+
+    /** 指定した公演数で、GUI手入力用の空プロジェクトを作成します。 */
+    public static SetlistProject newEmptyProject(int performanceCount) {
+        if (performanceCount < 1) {
+            throw new IllegalArgumentException("performanceCount must be positive");
+        }
+        List<SetlistSession> sessions = new ArrayList<>();
+        for (int index = 1; index <= performanceCount; index++) {
+            sessions.add(new SetlistSession("第" + index + "公演", List.of()));
+        }
+        return new SetlistProject(sessions);
     }
 }
