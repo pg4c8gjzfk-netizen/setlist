@@ -71,6 +71,10 @@ public class XlsxPerformanceReader {
         DataFormatter formatter = new DataFormatter();
         Row headerRow = sheet.getRow(0);
         if (headerRow == null) {
+            problems.add(problem(
+                    sheetName,
+                    0,
+                    "見出し行がありません。1行目に曲名・時間・出演者・人数の見出しを入力してください。"));
             return new LoadedSheet(List.of(), List.of());
         }
 

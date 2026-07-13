@@ -1,0 +1,40 @@
+{
+  "title": "Setlist defect audit",
+  "slug": "setlist-defect-audit",
+  "created_at": "2026-07-12T15:51:48+00:00",
+  "status": "complete",
+  "approval": {
+    "required": false,
+    "granted": true,
+    "notes": "User explicitly requested a 5.4-mini subagent audit when no known fix remains."
+  },
+  "packets": [
+    {
+      "id": "audit-01",
+      "owner": "subagent",
+      "status": "completed",
+      "write_scope": "none",
+      "agent_id": "019f5708-8945-7652-986b-c4dd42013771",
+      "model": "gpt-5.4-mini"
+    }
+  ],
+  "verification": {
+    "status": "passed",
+    "checks": [
+      {
+        "name": "XlsxPerformanceReaderValidationTest",
+        "status": "passed",
+        "tests": 5
+      },
+      {
+        "name": "mvn clean test",
+        "status": "passed",
+        "tests": 49
+      },
+      {
+        "name": "Windows package and GUI launch",
+        "status": "passed"
+      }
+    ]
+  }
+}

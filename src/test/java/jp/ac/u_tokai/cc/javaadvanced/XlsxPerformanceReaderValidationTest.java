@@ -94,6 +94,24 @@ public class XlsxPerformanceReaderValidationTest {
         assertTrue(sheets.getFirst().performances().isEmpty());
     }
 
+    @Test
+    public void missingHeaderFailsWholeImportWithSheetName() throws Exception {
+        File workbookFile = temporaryFolder.newFile("missing-header.xlsx");
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("見出しなし公演");
+            addPerformance(sheet, 1, "読み飛ばしてはいけない曲", "3:00");
+            write(workbook, workbookFile);
+        }
+
+        try {
+            new XlsxPerformanceReader().loadSheets(workbookFile);
+            fail("見出し行がないXLSXは読込に失敗する必要があります。");
+        } catch (XlsxPerformanceReader.XlsxImportException exception) {
+            assertTrue(exception.getMessage().contains("シート「見出しなし公演」の1行目"));
+            assertTrue(exception.getMessage().contains("見出し行がありません"));
+        }
+    }
+
     private Sheet createSheet(Workbook workbook, String name) {
         Sheet sheet = workbook.createSheet(name);
         Row header = sheet.createRow(0);
