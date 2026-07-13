@@ -14,6 +14,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -45,27 +46,38 @@ public class SetlistFrame extends JFrame {
     private final JButton excelButton;
     private final JLabel projectStatusLabel;
     private final UnsavedChangesPrompt unsavedChangesPrompt;
+    private final NewSetlistPrompt newSetlistPrompt;
     private final AppFileLocations fileLocations;
     private File selectedInputFile;
     private SetlistProject currentProject;
     private boolean projectAvailable;
     private boolean unsavedChanges;
     private File editableProjectFile;
+    private String projectFileName;
     private SetlistEditorFrame activeEditor;
 
     /** メイン画面を作成します。 */
     public SetlistFrame() {
-        this(UnsavedChangesPrompt.swingDialog(), new AppFileLocations());
+        this(UnsavedChangesPrompt.swingDialog(), NewSetlistPrompt.swingDialog(), new AppFileLocations());
     }
 
     SetlistFrame(UnsavedChangesPrompt unsavedChangesPrompt) {
-        this(unsavedChangesPrompt, new AppFileLocations());
+        this(unsavedChangesPrompt, NewSetlistPrompt.swingDialog(), new AppFileLocations());
     }
 
     SetlistFrame(UnsavedChangesPrompt unsavedChangesPrompt, AppFileLocations fileLocations) {
+        this(unsavedChangesPrompt, NewSetlistPrompt.swingDialog(), fileLocations);
+    }
+
+    SetlistFrame(
+            UnsavedChangesPrompt unsavedChangesPrompt,
+            NewSetlistPrompt newSetlistPrompt,
+            AppFileLocations fileLocations) {
         super("Setlist Studio");
         this.unsavedChangesPrompt = Objects.requireNonNull(
                 unsavedChangesPrompt, "unsavedChangesPrompt must not be null");
+        this.newSetlistPrompt = Objects.requireNonNull(
+                newSetlistPrompt, "newSetlistPrompt must not be null");
         this.fileLocations = Objects.requireNonNull(fileLocations, "fileLocations must not be null");
         this.inputFileField = new JTextField("XLSXファイルが選択されていません");
         this.resultArea = new JTextArea(22, 70);
@@ -81,6 +93,7 @@ public class SetlistFrame extends JFrame {
         this.currentProject = SetlistProjectFactory.newEmptyProject();
         this.projectAvailable = false;
         this.unsavedChanges = false;
+        this.projectFileName = NewSetlistSettings.DEFAULT_FILE_NAME;
 
         setupWindow();
     }
@@ -324,6 +337,7 @@ public class SetlistFrame extends JFrame {
             return;
         }
         closeActiveEditor();
+        projectFileName = editableFileNameForSource(selectedFile);
         replaceCurrentProject(generatedProject, true, null);
     }
 
@@ -352,6 +366,7 @@ public class SetlistFrame extends JFrame {
             return;
         }
         closeActiveEditor();
+        projectFileName = editableFileNameForSource(selectedFile);
         replaceCurrentProject(SetlistProjectFactory.fromImportedSheets(performanceSheets), false, null);
         openCurrentProjectEditor();
     }
@@ -368,11 +383,18 @@ public class SetlistFrame extends JFrame {
     }
 
     private void createNewProject() {
+        Optional<NewSetlistSettings> requestedSettings = newSetlistPrompt.ask(this);
+        if (requestedSettings.isEmpty()) {
+            return;
+        }
         if (!confirmProjectReplacement("新しい香盤表を作成する")) {
             return;
         }
+        NewSetlistSettings settings = requestedSettings.get();
         closeActiveEditor();
-        replaceCurrentProject(SetlistProjectFactory.newEmptyProject(), false, null);
+        projectFileName = settings.fileName();
+        replaceCurrentProject(
+                SetlistProjectFactory.newEmptyProject(settings.performanceCount()), true, null);
         openCurrentProjectEditor();
     }
 
@@ -387,7 +409,8 @@ public class SetlistFrame extends JFrame {
                 this::handleProjectChanged,
                 this::handleProjectSaved,
                 unsavedChanges,
-                fileLocations);
+                fileLocations,
+                projectFileName);
         activeEditor = editor;
         editor.addWindowListener(new WindowAdapter() {
             @Override
@@ -415,6 +438,9 @@ public class SetlistFrame extends JFrame {
         projectAvailable = !currentProject.sessions().isEmpty();
         unsavedChanges = dirty;
         editableProjectFile = savedFile == null ? null : savedFile.getAbsoluteFile();
+        if (editableProjectFile != null) {
+            projectFileName = NewSetlistSettings.normalizeFileName(editableProjectFile.getName());
+        }
         editButton.setEnabled(projectAvailable);
         saveProjectButton.setEnabled(projectAvailable);
         excelButton.setEnabled(projectAvailable);
@@ -457,7 +483,7 @@ public class SetlistFrame extends JFrame {
             JFileChooser chooser = new JFileChooser(fileLocations.outputDirectory());
             chooser.setDialogTitle("編集状態を保存");
             chooser.setFileFilter(new FileNameExtensionFilter("Excelファイル (*.xlsx)", "xlsx"));
-            chooser.setSelectedFile(fileLocations.defaultOutputFile("setlist-project.xlsx"));
+            chooser.setSelectedFile(suggestedEditableOutputFile());
             if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
                 return false;
             }
@@ -515,6 +541,19 @@ public class SetlistFrame extends JFrame {
         return unsavedChanges;
     }
 
+    SetlistProject currentProject() {
+        synchronizeActiveEditor();
+        return currentProject;
+    }
+
+    String projectFileName() {
+        return projectFileName;
+    }
+
+    File suggestedEditableOutputFile() {
+        return fileLocations.defaultOutputFile(projectFileName);
+    }
+
     private void synchronizeActiveEditor() {
         if (activeEditor != null && activeEditor.isDisplayable()) {
             activeEditor.commitPendingEdits();
@@ -549,18 +588,30 @@ public class SetlistFrame extends JFrame {
             AppTheme.updateStatusPill(
                     projectStatusLabel, "未保存の変更", AppTheme.WARNING);
             projectStatusLabel.setToolTipText("編集状態を保存すると、次回も再編集できます。");
-            setTitle("Setlist Studio *");
+            setTitle(projectWindowTitle(true));
             return;
         }
         if (editableProjectFile != null) {
             AppTheme.updateStatusPill(projectStatusLabel, "保存済み", AppTheme.SUCCESS);
             projectStatusLabel.setToolTipText(editableProjectFile.getAbsolutePath());
-            setTitle("Setlist Studio");
+            setTitle(projectWindowTitle(false));
             return;
         }
         AppTheme.updateStatusPill(projectStatusLabel, "変更なし", AppTheme.TEXT_SECONDARY);
         projectStatusLabel.setToolTipText("元データから変更されていません。");
-        setTitle("Setlist Studio");
+        setTitle(projectWindowTitle(false));
+    }
+
+    private String projectWindowTitle(boolean dirty) {
+        return "Setlist Studio — " + projectFileName + (dirty ? " *" : "");
+    }
+
+    private String editableFileNameForSource(File sourceFile) {
+        String sourceName = sourceFile.getName();
+        String baseName = sourceName.toLowerCase(java.util.Locale.ROOT).endsWith(".xlsx")
+                ? sourceName.substring(0, sourceName.length() - ".xlsx".length())
+                : sourceName;
+        return NewSetlistSettings.normalizeFileName(baseName + "_香盤表.xlsx");
     }
 
     private void exportCurrentProject() {
@@ -572,7 +623,8 @@ public class SetlistFrame extends JFrame {
         JFileChooser chooser = new JFileChooser(fileLocations.outputDirectory());
         chooser.setDialogTitle("現在の香盤表を配布用XLSXとして保存");
         chooser.setFileFilter(new FileNameExtensionFilter("Excelファイル (*.xlsx)", "xlsx"));
-        chooser.setSelectedFile(fileLocations.defaultOutputFile("output_setlist.xlsx"));
+        chooser.setSelectedFile(fileLocations.defaultOutputFile(
+                NewSetlistSettings.distributionFileName(projectFileName)));
         if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
             return;
         }
@@ -610,6 +662,7 @@ public class SetlistFrame extends JFrame {
 
     private String formatProject(SetlistProject project) {
         StringBuilder builder = new StringBuilder();
+        builder.append("ファイル名: ").append(projectFileName).append("\n\n");
         for (SetlistSession session : project.sessions()) {
             builder.append("【").append(session.name()).append("】\n");
             for (int index = 0; index < session.entries().size(); index++) {

@@ -66,10 +66,11 @@ public final class SetlistEditorFrame extends JFrame {
     private boolean rebuilding;
     private boolean sheetBoundariesLocked;
     private boolean unsavedChanges;
+    private String projectFileName;
 
     public SetlistEditorFrame(SetlistProject project, Consumer<SetlistProject> projectChangedHandler) {
         this(project, projectChangedHandler, (savedProject, outputFile) -> {
-        }, false, new AppFileLocations());
+        }, false, new AppFileLocations(), null);
     }
 
     SetlistEditorFrame(
@@ -77,7 +78,7 @@ public final class SetlistEditorFrame extends JFrame {
             Consumer<SetlistProject> projectChangedHandler,
             BiConsumer<SetlistProject, File> projectSavedHandler,
             boolean initiallyUnsaved) {
-        this(project, projectChangedHandler, projectSavedHandler, initiallyUnsaved, new AppFileLocations());
+        this(project, projectChangedHandler, projectSavedHandler, initiallyUnsaved, new AppFileLocations(), null);
     }
 
     SetlistEditorFrame(
@@ -86,6 +87,16 @@ public final class SetlistEditorFrame extends JFrame {
             BiConsumer<SetlistProject, File> projectSavedHandler,
             boolean initiallyUnsaved,
             AppFileLocations fileLocations) {
+        this(project, projectChangedHandler, projectSavedHandler, initiallyUnsaved, fileLocations, null);
+    }
+
+    SetlistEditorFrame(
+            SetlistProject project,
+            Consumer<SetlistProject> projectChangedHandler,
+            BiConsumer<SetlistProject, File> projectSavedHandler,
+            boolean initiallyUnsaved,
+            AppFileLocations fileLocations,
+            String projectFileName) {
         super("香盤表を編集");
         this.sessionTabs = new JTabbedPane();
         this.tableModels = new ArrayList<>();
@@ -101,6 +112,9 @@ public final class SetlistEditorFrame extends JFrame {
         this.boundaryStatusLabel.setVisible(false);
         this.saveStatusLabel = AppTheme.statusPill("変更なし", AppTheme.TEXT_SECONDARY);
         this.unsavedChanges = initiallyUnsaved;
+        this.projectFileName = projectFileName == null || projectFileName.isBlank()
+                ? null
+                : NewSetlistSettings.normalizeFileName(projectFileName);
         setupWindow();
         setProject(Objects.requireNonNull(project, "project must not be null"));
         updateSaveStatus();
@@ -579,7 +593,7 @@ public final class SetlistEditorFrame extends JFrame {
         JFileChooser chooser = new JFileChooser(fileLocations.outputDirectory());
         chooser.setDialogTitle("編集可能な香盤表を保存");
         chooser.setFileFilter(new FileNameExtensionFilter("Excelファイル (*.xlsx)", "xlsx"));
-        chooser.setSelectedFile(fileLocations.defaultOutputFile("setlist-project.xlsx"));
+        chooser.setSelectedFile(suggestedEditableOutputFile());
         if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
             return;
         }
@@ -606,6 +620,7 @@ public final class SetlistEditorFrame extends JFrame {
         File absoluteFile = outputFile.getAbsoluteFile();
         new XlsxSetlistProjectWriter().write(project, absoluteFile);
         fileLocations.rememberOutputFile(absoluteFile);
+        projectFileName = NewSetlistSettings.normalizeFileName(absoluteFile.getName());
         setUnsavedChanges(false);
         projectSavedHandler.accept(project, absoluteFile);
         return absoluteFile;
@@ -671,6 +686,13 @@ public final class SetlistEditorFrame extends JFrame {
         return unsavedChanges;
     }
 
+    File suggestedEditableOutputFile() {
+        String fileName = projectFileName == null
+                ? "setlist-project.xlsx"
+                : projectFileName;
+        return fileLocations.defaultOutputFile(fileName);
+    }
+
     private void setUnsavedChanges(boolean value) {
         unsavedChanges = value;
         updateSaveStatus();
@@ -681,12 +703,19 @@ public final class SetlistEditorFrame extends JFrame {
             AppTheme.updateStatusPill(
                     saveStatusLabel, "未保存の変更", AppTheme.WARNING);
             saveStatusLabel.setToolTipText("編集状態をXLSX保存すると保護できます。");
-            setTitle("香盤表を編集 *");
+            setTitle(editorWindowTitle(true));
         } else {
             AppTheme.updateStatusPill(saveStatusLabel, "変更なし", AppTheme.SUCCESS);
             saveStatusLabel.setToolTipText("現在の編集内容は保存済み、または変更されていません。");
-            setTitle("香盤表を編集");
+            setTitle(editorWindowTitle(false));
         }
+    }
+
+    private String editorWindowTitle(boolean dirty) {
+        String title = projectFileName == null
+                ? "香盤表を編集"
+                : "香盤表を編集 — " + projectFileName;
+        return title + (dirty ? " *" : "");
     }
 
     private void showValidationError(String message) {
