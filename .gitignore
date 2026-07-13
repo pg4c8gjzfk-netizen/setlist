@@ -11,3 +11,4 @@ Data/
 
 # 提出用に作成するzipはgit管理しない
 *.zip
+setlist_presentation.pptx
