@@ -90,6 +90,40 @@ public class SetlistEntryTableModelTest {
     }
 
     @Test
+    public void renamingPerformerUpdatesRosterAndEveryParticipatingEntry() {
+        SetlistEntry participating = entry(UUID.randomUUID());
+        SetlistEntry notParticipating = new SetlistEntry(
+                UUID.randomUUID(), UUID.randomUUID(), "別の演目", 120,
+                List.of("出演者B"), false, FixedPosition.NONE, -1);
+        SetlistEntryTableModel model = new SetlistEntryTableModel(
+                List.of(participating, notParticipating), List.of("出演者A", "出演者B"));
+
+        model.renamePerformer("出演者A", "出演者A 改名後");
+
+        assertEquals(List.of("出演者A 改名後", "出演者B"), model.performerNames());
+        assertEquals(List.of("出演者A 改名後"), model.entries().get(0).performers());
+        assertEquals(List.of("出演者B"), model.entries().get(1).performers());
+        assertEquals(-1, model.performerColumnIndex("出演者A"));
+        assertTrue(model.performerColumnIndex("出演者A 改名後") >= 3);
+    }
+
+    @Test
+    public void renamingPerformerRejectsDuplicateNameWithoutChangingEntries() {
+        SetlistEntryTableModel model = new SetlistEntryTableModel(
+                List.of(entry(UUID.randomUUID())), List.of("出演者A", "出演者B"));
+
+        try {
+            model.renamePerformer("出演者A", "出演者B");
+            fail("既存の演者名へ変更できてしまいました。");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("すでに登録"));
+        }
+
+        assertEquals(List.of("出演者A", "出演者B"), model.performerNames());
+        assertEquals(List.of("出演者A"), model.entries().getFirst().performers());
+    }
+
+    @Test
     public void invalidDurationDoesNotOverwriteExistingValue() {
         SetlistEntryTableModel model = new SetlistEntryTableModel(List.of(entry(UUID.randomUUID())));
         AtomicReference<String> error = new AtomicReference<>();

@@ -210,8 +210,11 @@ public class GuiComponentContractTest {
                 assertEquals("◯", ((JLabel) editingCell).getText());
                 assertEquals(Boolean.TRUE,
                         table.getColumnModel().getColumn(4).getCellEditor().getCellEditorValue());
-                assertNotNull(findButton(frame.getContentPane(), "演者を追加"));
-                assertNotNull(findButton(frame.getContentPane(), "演者を削除"));
+                assertNotNull(findButton(frame.getContentPane(), "演者を編集"));
+                assertNull(findComponent(
+                        frame.getContentPane(), JButton.class,
+                        candidate -> "演者を追加".equals(candidate.getText())
+                                || "演者を削除".equals(candidate.getText())));
                 assertNotNull(findButton(frame.getContentPane(), "先頭へ"));
                 assertNotNull(findButton(frame.getContentPane(), "末尾へ"));
                 assertNotNull(findButton(frame.getContentPane(), "指定順へ"));

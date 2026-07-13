@@ -3,24 +3,25 @@ package jp.ac.u_tokai.cc.javaadvanced;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.GraphicsEnvironment;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JButton;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-/** 演者を連続追加する入力フローのGUI契約テストです。 */
-public class PerformerBatchAddDialogTest {
+/** 演者一覧で追加・名前変更・削除できる統合画面のGUI契約テストです。 */
+public class PerformerManagementDialogTest {
 
     @BeforeClass
     public static void installApplicationTheme() {
@@ -28,44 +29,55 @@ public class PerformerBatchAddDialogTest {
     }
 
     @Test
-    public void keepsDialogOpenWhileAddingPerformersConsecutively() throws Exception {
+    public void managesPerformersWithoutLeavingTheDialog() throws Exception {
         Assume.assumeFalse(
                 "画面表示できない環境ではSwing契約テストを実行しません。",
                 GraphicsEnvironment.isHeadless());
 
         runOnEventDispatchThread(() -> {
-            SetlistEntryTableModel model = new SetlistEntryTableModel(List.of(), List.of("出演者A"));
-            PerformerBatchAddDialog dialog = new PerformerBatchAddDialog(null, model::addPerformer);
+            SetlistEntry entry = new SetlistEntry(
+                    UUID.randomUUID(), UUID.randomUUID(), "確認用演目", 180,
+                    List.of("出演者A"), false, FixedPosition.NONE, -1);
+            SetlistEntryTableModel model = new SetlistEntryTableModel(
+                    List.of(entry), List.of("出演者A", "出演者B"));
+            PerformerManagementDialog dialog = new PerformerManagementDialog(null, "第1公演", model);
             try {
+                JList<?> performerList = findComponent(dialog.getContentPane(), JList.class);
                 JTextField input = findComponent(dialog.getContentPane(), JTextField.class);
                 JButton addButton = findButton(dialog.getContentPane(), "追加");
+                JButton renameButton = findButton(dialog.getContentPane(), "名前を変更");
+                JButton removeButton = findButton(dialog.getContentPane(), "削除");
                 JButton doneButton = findButton(dialog.getContentPane(), "完了");
 
+                assertNotNull(performerList);
                 assertNotNull(input);
-                assertSame(addButton, dialog.getRootPane().getDefaultButton());
-                assertTrue(dialog.isDisplayable());
-
-                input.setText("出演者B");
-                addButton.doClick();
-                assertEquals(List.of("出演者A", "出演者B"), model.performerNames());
-                assertEquals("", input.getText());
-                assertTrue(dialog.isDisplayable());
-
-                input.setText("出演者C");
-                dialog.getRootPane().getDefaultButton().doClick();
-                assertEquals(List.of("出演者A", "出演者B", "出演者C"), model.performerNames());
-                assertEquals("", input.getText());
-                assertNotNull(findComponent(
-                        dialog.getContentPane(), JLabel.class,
-                        label -> label.getText().contains("追加済み 2人")));
+                assertEquals(2, performerList.getModel().getSize());
+                assertFalse(renameButton.isEnabled());
+                assertFalse(removeButton.isEnabled());
 
                 input.setText("出演者C");
                 addButton.doClick();
                 assertEquals(List.of("出演者A", "出演者B", "出演者C"), model.performerNames());
-                assertEquals("出演者C", input.getText());
+                assertTrue(dialog.isDisplayable());
+
+                performerList.setSelectedValue("出演者A", true);
+                assertTrue(renameButton.isEnabled());
+                assertTrue(removeButton.isEnabled());
+                input.setText("出演者A 改名後");
+                renameButton.doClick();
+                assertEquals(List.of("出演者A 改名後", "出演者B", "出演者C"), model.performerNames());
+                assertEquals(List.of("出演者A 改名後"), model.entries().getFirst().performers());
+
+                performerList.setSelectedValue("出演者C", true);
+                removeButton.doClick();
+                assertEquals(List.of("出演者A 改名後", "出演者B"), model.performerNames());
+
+                performerList.setSelectedValue("出演者A 改名後", true);
+                removeButton.doClick();
+                assertEquals(List.of("出演者A 改名後", "出演者B"), model.performerNames());
                 assertNotNull(findComponent(
                         dialog.getContentPane(), JLabel.class,
-                        label -> label.getText().contains("すでに登録されています")));
+                        label -> label.getText().contains("出演中")));
 
                 doneButton.doClick();
                 assertFalse(dialog.isDisplayable());

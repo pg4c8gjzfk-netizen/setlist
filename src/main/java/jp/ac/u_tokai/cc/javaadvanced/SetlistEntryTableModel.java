@@ -108,6 +108,43 @@ public final class SetlistEntryTableModel extends AbstractTableModel {
         changedHandler.run();
     }
 
+    /** 演者カラム名と、その演者が出演する全演目の名前を変更します。 */
+    public void renamePerformer(String currentName, String newName) {
+        String normalizedCurrentName = normalizePerformerName(currentName);
+        String normalizedNewName = normalizePerformerName(newName);
+        int performerIndex = performerNames.indexOf(normalizedCurrentName);
+        if (performerIndex < 0) {
+            throw new IllegalArgumentException("演者「" + normalizedCurrentName + "」は登録されていません。");
+        }
+        if (normalizedCurrentName.equals(normalizedNewName)) {
+            return;
+        }
+        if (performerNames.contains(normalizedNewName)) {
+            throw new IllegalArgumentException("演者「" + normalizedNewName + "」はすでに登録されています。");
+        }
+
+        performerNames.set(performerIndex, normalizedNewName);
+        for (int rowIndex = 0; rowIndex < entries.size(); rowIndex++) {
+            SetlistEntry entry = entries.get(rowIndex);
+            if (!entry.performers().contains(normalizedCurrentName)) {
+                continue;
+            }
+            List<String> renamedPerformers = entry.performers().stream()
+                    .map(name -> normalizedCurrentName.equals(name) ? normalizedNewName : name)
+                    .toList();
+            entries.set(rowIndex, copy(
+                    entry,
+                    entry.title(),
+                    entry.durationSeconds(),
+                    renamedPerformers,
+                    entry.fixed(),
+                    entry.fixedPosition(),
+                    entry.fixedIndex()));
+        }
+        fireTableStructureChanged();
+        changedHandler.run();
+    }
+
     /** 出演中の演目がない演者カラムを削除します。 */
     public void removePerformer(String performerName) {
         String normalizedName = normalizePerformerName(performerName);

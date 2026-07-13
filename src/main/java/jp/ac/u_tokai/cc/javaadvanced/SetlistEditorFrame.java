@@ -236,16 +236,12 @@ public final class SetlistEditorFrame extends JFrame {
         explanation.add(Box.createVerticalStrut(4));
         explanation.add(AppTheme.body("出演する演目のセルを選ぶと◯が付き、空欄は出演なしを表します。"));
 
-        JButton addPerformerButton = AppTheme.quietButton("演者を追加");
-        JButton removePerformerButton = AppTheme.quietButton("演者を削除");
-        AppTheme.styleDanger(removePerformerButton);
-        addPerformerButton.addActionListener(event -> addPerformer());
-        removePerformerButton.addActionListener(event -> removePerformer());
+        JButton editPerformersButton = AppTheme.quietButton("演者を編集");
+        editPerformersButton.addActionListener(event -> editPerformers());
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         actions.setOpaque(false);
-        actions.add(addPerformerButton);
-        actions.add(removePerformerButton);
+        actions.add(editPerformersButton);
 
         panel.add(explanation, BorderLayout.WEST);
         panel.add(actions, BorderLayout.EAST);
@@ -418,35 +414,11 @@ public final class SetlistEditorFrame extends JFrame {
         selectedModel().ifPresent(SetlistEntryTableModel::addEntry);
     }
 
-    private void addPerformer() {
+    private void editPerformers() {
         selectedModel().ifPresent(model -> {
-            PerformerBatchAddDialog dialog = new PerformerBatchAddDialog(this, model::addPerformer);
+            String sessionName = sessionTabs.getTitleAt(sessionTabs.getSelectedIndex());
+            PerformerManagementDialog dialog = new PerformerManagementDialog(this, sessionName, model);
             dialog.setVisible(true);
-        });
-    }
-
-    private void removePerformer() {
-        selectedModel().ifPresent(model -> {
-            if (model.performerNames().isEmpty()) {
-                showValidationError("削除できる演者がいません。");
-                return;
-            }
-            String performerName = (String) JOptionPane.showInputDialog(
-                    this,
-                    "削除する演者を選んでください。出演中の演者は削除できません。",
-                    "演者を削除",
-                    JOptionPane.QUESTION_MESSAGE,
-                    null,
-                    model.performerNames().toArray(),
-                    model.performerNames().getFirst());
-            if (performerName == null) {
-                return;
-            }
-            try {
-                model.removePerformer(performerName);
-            } catch (IllegalArgumentException exception) {
-                showValidationError(exception.getMessage());
-            }
         });
     }
 
